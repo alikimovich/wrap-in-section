@@ -1,0 +1,2703 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+</head>
+<body>
+<script>
+
+(function(l, r) { if (l.getElementById('livereloadscript')) return; r = l.createElement('script'); r.async = 1; r.src = '//' + (window.location.host || 'localhost').split(':')[0] + ':35729/livereload.js?snipver=1'; r.id = 'livereloadscript'; l.getElementsByTagName('head')[0].appendChild(r) })(window.document);
+var ui = (function () {
+    'use strict';
+
+    function noop() { }
+    function assign(tar, src) {
+        // @ts-ignore
+        for (const k in src)
+            tar[k] = src[k];
+        return tar;
+    }
+    function add_location(element, file, line, column, char) {
+        element.__svelte_meta = {
+            loc: { file, line, column, char }
+        };
+    }
+    function run(fn) {
+        return fn();
+    }
+    function blank_object() {
+        return Object.create(null);
+    }
+    function run_all(fns) {
+        fns.forEach(run);
+    }
+    function is_function(thing) {
+        return typeof thing === 'function';
+    }
+    function safe_not_equal(a, b) {
+        return a != a ? b == b : a !== b || ((a && typeof a === 'object') || typeof a === 'function');
+    }
+    function is_empty(obj) {
+        return Object.keys(obj).length === 0;
+    }
+    function validate_store(store, name) {
+        if (store != null && typeof store.subscribe !== 'function') {
+            throw new Error(`'${name}' is not a store with a 'subscribe' method`);
+        }
+    }
+    function subscribe(store, ...callbacks) {
+        if (store == null) {
+            return noop;
+        }
+        const unsub = store.subscribe(...callbacks);
+        return unsub.unsubscribe ? () => unsub.unsubscribe() : unsub;
+    }
+    function component_subscribe(component, store, callback) {
+        component.$$.on_destroy.push(subscribe(store, callback));
+    }
+    function create_slot(definition, ctx, $$scope, fn) {
+        if (definition) {
+            const slot_ctx = get_slot_context(definition, ctx, $$scope, fn);
+            return definition[0](slot_ctx);
+        }
+    }
+    function get_slot_context(definition, ctx, $$scope, fn) {
+        return definition[1] && fn
+            ? assign($$scope.ctx.slice(), definition[1](fn(ctx)))
+            : $$scope.ctx;
+    }
+    function get_slot_changes(definition, $$scope, dirty, fn) {
+        if (definition[2] && fn) {
+            const lets = definition[2](fn(dirty));
+            if ($$scope.dirty === undefined) {
+                return lets;
+            }
+            if (typeof lets === 'object') {
+                const merged = [];
+                const len = Math.max($$scope.dirty.length, lets.length);
+                for (let i = 0; i < len; i += 1) {
+                    merged[i] = $$scope.dirty[i] | lets[i];
+                }
+                return merged;
+            }
+            return $$scope.dirty | lets;
+        }
+        return $$scope.dirty;
+    }
+    function update_slot_base(slot, slot_definition, ctx, $$scope, slot_changes, get_slot_context_fn) {
+        if (slot_changes) {
+            const slot_context = get_slot_context(slot_definition, ctx, $$scope, get_slot_context_fn);
+            slot.p(slot_context, slot_changes);
+        }
+    }
+    function get_all_dirty_from_scope($$scope) {
+        if ($$scope.ctx.length > 32) {
+            const dirty = [];
+            const length = $$scope.ctx.length / 32;
+            for (let i = 0; i < length; i++) {
+                dirty[i] = -1;
+            }
+            return dirty;
+        }
+        return -1;
+    }
+    function null_to_empty(value) {
+        return value == null ? '' : value;
+    }
+    function append(target, node) {
+        target.appendChild(node);
+    }
+    function append_styles(target, style_sheet_id, styles) {
+        const append_styles_to = get_root_for_style(target);
+        if (!append_styles_to.getElementById(style_sheet_id)) {
+            const style = element('style');
+            style.id = style_sheet_id;
+            style.textContent = styles;
+            append_stylesheet(append_styles_to, style);
+        }
+    }
+    function get_root_for_style(node) {
+        if (!node)
+            return document;
+        const root = node.getRootNode ? node.getRootNode() : node.ownerDocument;
+        if (root && root.host) {
+            return root;
+        }
+        return node.ownerDocument;
+    }
+    function append_stylesheet(node, style) {
+        append(node.head || node, style);
+        return style.sheet;
+    }
+    function insert(target, node, anchor) {
+        target.insertBefore(node, anchor || null);
+    }
+    function detach(node) {
+        if (node.parentNode) {
+            node.parentNode.removeChild(node);
+        }
+    }
+    function destroy_each(iterations, detaching) {
+        for (let i = 0; i < iterations.length; i += 1) {
+            if (iterations[i])
+                iterations[i].d(detaching);
+        }
+    }
+    function element(name) {
+        return document.createElement(name);
+    }
+    function svg_element(name) {
+        return document.createElementNS('http://www.w3.org/2000/svg', name);
+    }
+    function text(data) {
+        return document.createTextNode(data);
+    }
+    function space() {
+        return text(' ');
+    }
+    function empty() {
+        return text('');
+    }
+    function listen(node, event, handler, options) {
+        node.addEventListener(event, handler, options);
+        return () => node.removeEventListener(event, handler, options);
+    }
+    function prevent_default(fn) {
+        return function (event) {
+            event.preventDefault();
+            // @ts-ignore
+            return fn.call(this, event);
+        };
+    }
+    function attr(node, attribute, value) {
+        if (value == null)
+            node.removeAttribute(attribute);
+        else if (node.getAttribute(attribute) !== value)
+            node.setAttribute(attribute, value);
+    }
+    function to_number(value) {
+        return value === '' ? null : +value;
+    }
+    function children(element) {
+        return Array.from(element.childNodes);
+    }
+    function set_input_value(input, value) {
+        input.value = value == null ? '' : value;
+    }
+    function set_style(node, key, value, important) {
+        if (value === null) {
+            node.style.removeProperty(key);
+        }
+        else {
+            node.style.setProperty(key, value, important ? 'important' : '');
+        }
+    }
+    function toggle_class(element, name, toggle) {
+        element.classList[toggle ? 'add' : 'remove'](name);
+    }
+    function custom_event(type, detail, { bubbles = false, cancelable = false } = {}) {
+        const e = document.createEvent('CustomEvent');
+        e.initCustomEvent(type, bubbles, cancelable, detail);
+        return e;
+    }
+    class HtmlTag {
+        constructor(is_svg = false) {
+            this.is_svg = false;
+            this.is_svg = is_svg;
+            this.e = this.n = null;
+        }
+        c(html) {
+            this.h(html);
+        }
+        m(html, target, anchor = null) {
+            if (!this.e) {
+                if (this.is_svg)
+                    this.e = svg_element(target.nodeName);
+                else
+                    this.e = element(target.nodeName);
+                this.t = target;
+                this.c(html);
+            }
+            this.i(anchor);
+        }
+        h(html) {
+            this.e.innerHTML = html;
+            this.n = Array.from(this.e.childNodes);
+        }
+        i(anchor) {
+            for (let i = 0; i < this.n.length; i += 1) {
+                insert(this.t, this.n[i], anchor);
+            }
+        }
+        p(html) {
+            this.d();
+            this.h(html);
+            this.i(this.a);
+        }
+        d() {
+            this.n.forEach(detach);
+        }
+    }
+
+    let current_component;
+    function set_current_component(component) {
+        current_component = component;
+    }
+    function get_current_component() {
+        if (!current_component)
+            throw new Error('Function called outside component initialization');
+        return current_component;
+    }
+    /**
+     * The `onMount` function schedules a callback to run as soon as the component has been mounted to the DOM.
+     * It must be called during the component's initialisation (but doesn't need to live *inside* the component;
+     * it can be called from an external module).
+     *
+     * `onMount` does not run inside a [server-side component](/docs#run-time-server-side-component-api).
+     *
+     * https://svelte.dev/docs#run-time-svelte-onmount
+     */
+    function onMount(fn) {
+        get_current_component().$$.on_mount.push(fn);
+    }
+    // TODO figure out if we still want to support
+    // shorthand events, or if we want to implement
+    // a real bubbling mechanism
+    function bubble(component, event) {
+        const callbacks = component.$$.callbacks[event.type];
+        if (callbacks) {
+            // @ts-ignore
+            callbacks.slice().forEach(fn => fn.call(this, event));
+        }
+    }
+
+    const dirty_components = [];
+    const binding_callbacks = [];
+    const render_callbacks = [];
+    const flush_callbacks = [];
+    const resolved_promise = Promise.resolve();
+    let update_scheduled = false;
+    function schedule_update() {
+        if (!update_scheduled) {
+            update_scheduled = true;
+            resolved_promise.then(flush);
+        }
+    }
+    function add_render_callback(fn) {
+        render_callbacks.push(fn);
+    }
+    function add_flush_callback(fn) {
+        flush_callbacks.push(fn);
+    }
+    // flush() calls callbacks in this order:
+    // 1. All beforeUpdate callbacks, in order: parents before children
+    // 2. All bind:this callbacks, in reverse order: children before parents.
+    // 3. All afterUpdate callbacks, in order: parents before children. EXCEPT
+    //    for afterUpdates called during the initial onMount, which are called in
+    //    reverse order: children before parents.
+    // Since callbacks might update component values, which could trigger another
+    // call to flush(), the following steps guard against this:
+    // 1. During beforeUpdate, any updated components will be added to the
+    //    dirty_components array and will cause a reentrant call to flush(). Because
+    //    the flush index is kept outside the function, the reentrant call will pick
+    //    up where the earlier call left off and go through all dirty components. The
+    //    current_component value is saved and restored so that the reentrant call will
+    //    not interfere with the "parent" flush() call.
+    // 2. bind:this callbacks cannot trigger new flush() calls.
+    // 3. During afterUpdate, any updated components will NOT have their afterUpdate
+    //    callback called a second time; the seen_callbacks set, outside the flush()
+    //    function, guarantees this behavior.
+    const seen_callbacks = new Set();
+    let flushidx = 0; // Do *not* move this inside the flush() function
+    function flush() {
+        // Do not reenter flush while dirty components are updated, as this can
+        // result in an infinite loop. Instead, let the inner flush handle it.
+        // Reentrancy is ok afterwards for bindings etc.
+        if (flushidx !== 0) {
+            return;
+        }
+        const saved_component = current_component;
+        do {
+            // first, call beforeUpdate functions
+            // and update components
+            try {
+                while (flushidx < dirty_components.length) {
+                    const component = dirty_components[flushidx];
+                    flushidx++;
+                    set_current_component(component);
+                    update(component.$$);
+                }
+            }
+            catch (e) {
+                // reset dirty state to not end up in a deadlocked state and then rethrow
+                dirty_components.length = 0;
+                flushidx = 0;
+                throw e;
+            }
+            set_current_component(null);
+            dirty_components.length = 0;
+            flushidx = 0;
+            while (binding_callbacks.length)
+                binding_callbacks.pop()();
+            // then, once components are updated, call
+            // afterUpdate functions. This may cause
+            // subsequent updates...
+            for (let i = 0; i < render_callbacks.length; i += 1) {
+                const callback = render_callbacks[i];
+                if (!seen_callbacks.has(callback)) {
+                    // ...so guard against infinite loops
+                    seen_callbacks.add(callback);
+                    callback();
+                }
+            }
+            render_callbacks.length = 0;
+        } while (dirty_components.length);
+        while (flush_callbacks.length) {
+            flush_callbacks.pop()();
+        }
+        update_scheduled = false;
+        seen_callbacks.clear();
+        set_current_component(saved_component);
+    }
+    function update($$) {
+        if ($$.fragment !== null) {
+            $$.update();
+            run_all($$.before_update);
+            const dirty = $$.dirty;
+            $$.dirty = [-1];
+            $$.fragment && $$.fragment.p($$.ctx, dirty);
+            $$.after_update.forEach(add_render_callback);
+        }
+    }
+    const outroing = new Set();
+    let outros;
+    function group_outros() {
+        outros = {
+            r: 0,
+            c: [],
+            p: outros // parent group
+        };
+    }
+    function check_outros() {
+        if (!outros.r) {
+            run_all(outros.c);
+        }
+        outros = outros.p;
+    }
+    function transition_in(block, local) {
+        if (block && block.i) {
+            outroing.delete(block);
+            block.i(local);
+        }
+    }
+    function transition_out(block, local, detach, callback) {
+        if (block && block.o) {
+            if (outroing.has(block))
+                return;
+            outroing.add(block);
+            outros.c.push(() => {
+                outroing.delete(block);
+                if (callback) {
+                    if (detach)
+                        block.d(1);
+                    callback();
+                }
+            });
+            block.o(local);
+        }
+        else if (callback) {
+            callback();
+        }
+    }
+
+    function bind(component, name, callback) {
+        const index = component.$$.props[name];
+        if (index !== undefined) {
+            component.$$.bound[index] = callback;
+            callback(component.$$.ctx[index]);
+        }
+    }
+    function create_component(block) {
+        block && block.c();
+    }
+    function mount_component(component, target, anchor, customElement) {
+        const { fragment, after_update } = component.$$;
+        fragment && fragment.m(target, anchor);
+        if (!customElement) {
+            // onMount happens before the initial afterUpdate
+            add_render_callback(() => {
+                const new_on_destroy = component.$$.on_mount.map(run).filter(is_function);
+                // if the component was destroyed immediately
+                // it will update the `$$.on_destroy` reference to `null`.
+                // the destructured on_destroy may still reference to the old array
+                if (component.$$.on_destroy) {
+                    component.$$.on_destroy.push(...new_on_destroy);
+                }
+                else {
+                    // Edge case - component was destroyed immediately,
+                    // most likely as a result of a binding initialising
+                    run_all(new_on_destroy);
+                }
+                component.$$.on_mount = [];
+            });
+        }
+        after_update.forEach(add_render_callback);
+    }
+    function destroy_component(component, detaching) {
+        const $$ = component.$$;
+        if ($$.fragment !== null) {
+            run_all($$.on_destroy);
+            $$.fragment && $$.fragment.d(detaching);
+            // TODO null out other refs, including component.$$ (but need to
+            // preserve final state?)
+            $$.on_destroy = $$.fragment = null;
+            $$.ctx = [];
+        }
+    }
+    function make_dirty(component, i) {
+        if (component.$$.dirty[0] === -1) {
+            dirty_components.push(component);
+            schedule_update();
+            component.$$.dirty.fill(0);
+        }
+        component.$$.dirty[(i / 31) | 0] |= (1 << (i % 31));
+    }
+    function init(component, options, instance, create_fragment, not_equal, props, append_styles, dirty = [-1]) {
+        const parent_component = current_component;
+        set_current_component(component);
+        const $$ = component.$$ = {
+            fragment: null,
+            ctx: [],
+            // state
+            props,
+            update: noop,
+            not_equal,
+            bound: blank_object(),
+            // lifecycle
+            on_mount: [],
+            on_destroy: [],
+            on_disconnect: [],
+            before_update: [],
+            after_update: [],
+            context: new Map(options.context || (parent_component ? parent_component.$$.context : [])),
+            // everything else
+            callbacks: blank_object(),
+            dirty,
+            skip_bound: false,
+            root: options.target || parent_component.$$.root
+        };
+        append_styles && append_styles($$.root);
+        let ready = false;
+        $$.ctx = instance
+            ? instance(component, options.props || {}, (i, ret, ...rest) => {
+                const value = rest.length ? rest[0] : ret;
+                if ($$.ctx && not_equal($$.ctx[i], $$.ctx[i] = value)) {
+                    if (!$$.skip_bound && $$.bound[i])
+                        $$.bound[i](value);
+                    if (ready)
+                        make_dirty(component, i);
+                }
+                return ret;
+            })
+            : [];
+        $$.update();
+        ready = true;
+        run_all($$.before_update);
+        // `false` as a special case of no DOM component
+        $$.fragment = create_fragment ? create_fragment($$.ctx) : false;
+        if (options.target) {
+            if (options.hydrate) {
+                const nodes = children(options.target);
+                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                $$.fragment && $$.fragment.l(nodes);
+                nodes.forEach(detach);
+            }
+            else {
+                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                $$.fragment && $$.fragment.c();
+            }
+            if (options.intro)
+                transition_in(component.$$.fragment);
+            mount_component(component, options.target, options.anchor, options.customElement);
+            flush();
+        }
+        set_current_component(parent_component);
+    }
+    /**
+     * Base class for Svelte components. Used when dev=false.
+     */
+    class SvelteComponent {
+        $destroy() {
+            destroy_component(this, 1);
+            this.$destroy = noop;
+        }
+        $on(type, callback) {
+            if (!is_function(callback)) {
+                return noop;
+            }
+            const callbacks = (this.$$.callbacks[type] || (this.$$.callbacks[type] = []));
+            callbacks.push(callback);
+            return () => {
+                const index = callbacks.indexOf(callback);
+                if (index !== -1)
+                    callbacks.splice(index, 1);
+            };
+        }
+        $set($$props) {
+            if (this.$$set && !is_empty($$props)) {
+                this.$$.skip_bound = true;
+                this.$$set($$props);
+                this.$$.skip_bound = false;
+            }
+        }
+    }
+
+    function dispatch_dev(type, detail) {
+        document.dispatchEvent(custom_event(type, Object.assign({ version: '3.55.1' }, detail), { bubbles: true }));
+    }
+    function append_dev(target, node) {
+        dispatch_dev('SvelteDOMInsert', { target, node });
+        append(target, node);
+    }
+    function insert_dev(target, node, anchor) {
+        dispatch_dev('SvelteDOMInsert', { target, node, anchor });
+        insert(target, node, anchor);
+    }
+    function detach_dev(node) {
+        dispatch_dev('SvelteDOMRemove', { node });
+        detach(node);
+    }
+    function listen_dev(node, event, handler, options, has_prevent_default, has_stop_propagation) {
+        const modifiers = options === true ? ['capture'] : options ? Array.from(Object.keys(options)) : [];
+        if (has_prevent_default)
+            modifiers.push('preventDefault');
+        if (has_stop_propagation)
+            modifiers.push('stopPropagation');
+        dispatch_dev('SvelteDOMAddEventListener', { node, event, handler, modifiers });
+        const dispose = listen(node, event, handler, options);
+        return () => {
+            dispatch_dev('SvelteDOMRemoveEventListener', { node, event, handler, modifiers });
+            dispose();
+        };
+    }
+    function attr_dev(node, attribute, value) {
+        attr(node, attribute, value);
+        if (value == null)
+            dispatch_dev('SvelteDOMRemoveAttribute', { node, attribute });
+        else
+            dispatch_dev('SvelteDOMSetAttribute', { node, attribute, value });
+    }
+    function prop_dev(node, property, value) {
+        node[property] = value;
+        dispatch_dev('SvelteDOMSetProperty', { node, property, value });
+    }
+    function set_data_dev(text, data) {
+        data = '' + data;
+        if (text.wholeText === data)
+            return;
+        dispatch_dev('SvelteDOMSetData', { node: text, data });
+        text.data = data;
+    }
+    function validate_each_argument(arg) {
+        if (typeof arg !== 'string' && !(arg && typeof arg === 'object' && 'length' in arg)) {
+            let msg = '{#each} only iterates over array-like objects.';
+            if (typeof Symbol === 'function' && arg && Symbol.iterator in arg) {
+                msg += ' You can use a spread to convert this iterable into an array.';
+            }
+            throw new Error(msg);
+        }
+    }
+    function validate_slots(name, slot, keys) {
+        for (const slot_key of Object.keys(slot)) {
+            if (!~keys.indexOf(slot_key)) {
+                console.warn(`<${name}> received an unexpected slot "${slot_key}".`);
+            }
+        }
+    }
+    /**
+     * Base class for Svelte components with some minor dev-enhancements. Used when dev=true.
+     */
+    class SvelteComponentDev extends SvelteComponent {
+        constructor(options) {
+            if (!options || (!options.target && !options.$$inline)) {
+                throw new Error("'target' is a required option");
+            }
+            super();
+        }
+        $destroy() {
+            super.$destroy();
+            this.$destroy = () => {
+                console.warn('Component was already destroyed'); // eslint-disable-line no-console
+            };
+        }
+        $capture_state() { }
+        $inject_state() { }
+    }
+
+    function styleInject(css, ref) {
+      if ( ref === void 0 ) ref = {};
+      var insertAt = ref.insertAt;
+
+      if (!css || typeof document === 'undefined') { return; }
+
+      var head = document.head || document.getElementsByTagName('head')[0];
+      var style = document.createElement('style');
+      style.type = 'text/css';
+
+      if (insertAt === 'top') {
+        if (head.firstChild) {
+          head.insertBefore(style, head.firstChild);
+        } else {
+          head.appendChild(style);
+        }
+      } else {
+        head.appendChild(style);
+      }
+
+      if (style.styleSheet) {
+        style.styleSheet.cssText = css;
+      } else {
+        style.appendChild(document.createTextNode(css));
+      }
+    }
+
+    var css_248z = ":root{--blue:var(--figma-color-bg-brand);--purple:var(--figma-color-bg-component);--hot-pink:#f0f;--green:#1bc47d;--red:var(--figma-color-bg-danger);--yellow:var(--figma-color-bg-warning);--black:#000;--black8:var(--figma-color-text);--black8-opaque:#333;--black3:var(--figma-color-text-secondary);--black3-opaque:#7a7a7a;--white:var(--figma-color-bg);--white8:var(--figma-color-text-onbrand-secondary);--white4:var(--figma-color-text-onbrand-tertiary);--grey:#f0f0f0;--silver:var(--figma-color-border);--hud:#222;--toolbar:var(--figma-color-bg-inverse);--black1:rgba(0,0,0,.1);--blue3:rgba(24,145,251,.3);--purple4:var(--figma-color-text-component-secondary);--hover-fill:var(--figma-color-bg-hover);--selection-a:var(--figma-color-bg-selected);--selection-b:var(--figma-color-bg-selected-secondary);--white2:var(--figma-color-text-onbrand-tertiary);--color-bg-menu:#1e1e1e;--color-text-menu-text:#fff;--color-text-menu-secondary:hsla(0,0%,100%,.7);--color-border-menu:#383838;--text-highlight:rgba(13,153,255,.4);--font-stack:\"Inter\",sans-serif;--font-size-xsmall:11px;--font-size-small:12px;--font-size-large:13px;--font-size-xlarge:14px;--font-weight-normal:400;--font-weight-medium:500;--font-weight-bold:600;--font-line-height:16px;--font-line-height-large:24px;--font-letter-spacing-pos-xsmall:.005em;--font-letter-spacing-neg-xsmall:.01em;--font-letter-spacing-pos-small:0;--font-letter-spacing-neg-small:.005em;--font-letter-spacing-pos-large:-.0025em;--font-letter-spacing-neg-large:.0025em;--font-letter-spacing-pos-xlarge:-.001em;--font-letter-spacing-neg-xlarge:-.001em;--border-radius-small:2px;--border-radius-med:5px;--border-radius-large:6px;--shadow-hud:0 5px 17px rgba(0,0,0,.2),0 2px 7px rgba(0,0,0,.15);--shadow-floating-window:0 2px 14px rgba(0,0,0,.15);--size-xxxsmall:4px;--size-xxsmall:8px;--size-xsmall:16px;--size-small:24px;--size-medium:32px;--size-large:40px;--size-xlarge:48px;--size-xxlarge:64px;--size-huge:80px}*,body{box-sizing:border-box}body{font-family:Inter,sans-serif;margin:0;padding:0;position:relative}@font-face{font-family:Inter;font-style:normal;font-weight:400;src:url(https://rsms.me/inter/font-files/Inter-Regular.woff2?v=3.7) format(\"woff2\"),url(https://rsms.me/inter/font-files/Inter-Regular.woff?v=3.7) format(\"woff\")}@font-face{font-family:Inter;font-style:normal;font-weight:500;src:url(https://rsms.me/inter/font-files/Inter-Medium.woff2?v=3.7) format(\"woff2\"),url(https://rsms.me/inter/font-files/Inter-Medium.woff2?v=3.7) format(\"woff\")}@font-face{font-family:Inter;font-style:normal;font-weight:600;src:url(https://rsms.me/inter/font-files/Inter-SemiBold.woff2?v=3.7) format(\"woff2\"),url(https://rsms.me/inter/font-files/Inter-SemiBold.woff2?v=3.7) format(\"woff\")}a{cursor:pointer;text-decoration:none}a,a:active,a:hover{color:var(--blue)}a:focus{text-decoration:underline}.p-xxxsmall{padding:var(--size-xxxsmall)}.p-xxsmall{padding:var(--size-xxsmall)}.p-xsmall{padding:var(--size-xsmall)}.p-small{padding:var(--size-small)}.p-medium{padding:var(--size-medium)}.p-large{padding:var(--size-large)}.p-xlarge{padding:var(--size-xlarge)}.p-xxlarge{padding:var(--size-xxlarge)}.p-huge{padding:var(--size-huge)}.pt-xxxsmall{padding-top:var(--size-xxxsmall)}.pt-xxsmall{padding-top:var(--size-xxsmall)}.pt-xsmall{padding-top:var(--size-xsmall)}.pt-small{padding-top:var(--size-small)}.pt-medium{padding-top:var(--size-medium)}.pt-large{padding-top:var(--size-large)}.pt-xlarge{padding-top:var(--size-xlarge)}.pt-xxlarge{padding-top:var(--size-xxlarge)}.pt-huge{padding-top:var(--size-huge)}.pr-xxxsmall{padding-right:var(--size-xxxsmall)}.pr-xxsmall{padding-right:var(--size-xxsmall)}.pr-xsmall{padding-right:var(--size-xsmall)}.pr-small{padding-right:var(--size-small)}.pr-medium{padding-right:var(--size-medium)}.pr-large{padding-right:var(--size-large)}.pr-xlarge{padding-right:var(--size-xlarge)}.pr-xxlarge{padding-right:var(--size-xxlarge)}.pr-huge{padding-right:var(--size-huge)}.pb-xxxsmall{padding-bottom:var(--size-xxxsmall)}.pb-xxsmall{padding-bottom:var(--size-xxsmall)}.pb-xsmall{padding-bottom:var(--size-xsmall)}.pb-small{padding-bottom:var(--size-small)}.pb-medium{padding-bottom:var(--size-medium)}.pb-large{padding-bottom:var(--size-large)}.pb-xlarge{padding-bottom:var(--size-xlarge)}.pb-xxlarge{padding-bottom:var(--size-xxlarge)}.pb-huge{padding-bottom:var(--size-huge)}.pl-xxxsmall{padding-left:var(--size-xxxsmall)}.pl-xxsmall{padding-left:var(--size-xxsmall)}.pl-xsmall{padding-left:var(--size-xsmall)}.pl-small{padding-left:var(--size-small)}.pl-medium{padding-left:var(--size-medium)}.pl-large{padding-left:var(--size-large)}.pl-xlarge{padding-left:var(--size-xlarge)}.pl-xxlarge{padding-left:var(--size-xxlarge)}.pl-huge{padding-left:var(--size-huge)}.m-xxxsmall{margin:var(--size-xxxsmall)}.m-xxsmall{margin:var(--size-xxsmall)}.m-xsmall{margin:var(--size-xsmall)}.m-small{margin:var(--size-small)}.m-medium{margin:var(--size-medium)}.m-large{margin:var(--size-large)}.m-xlarge{margin:var(--size-xlarge)}.m-xxlarge{margin:var(--size-xxlarge)}.m-huge{margin:var(--size-huge)}.mt-xxxsmall{margin-top:var(--size-xxxsmall)}.mt-xxsmall{margin-top:var(--size-xxsmall)}.mt-xsmall{margin-top:var(--size-xsmall)}.mt-small{margin-top:var(--size-small)}.mt-medium{margin-top:var(--size-medium)}.mt-large{margin-top:var(--size-large)}.mt-xlarge{margin-top:var(--size-xlarge)}.mt-xxlarge{margin-top:var(--size-xxlarge)}.mt-huge{margin-top:var(--size-huge)}.mr-xxxsmall{margin-right:var(--size-xxxsmall)}.mr-xxsmall{margin-right:var(--size-xxsmall)}.mr-xsmall{margin-right:var(--size-xsmall)}.mr-small{margin-right:var(--size-small)}.mr-medium{margin-right:var(--size-medium)}.mr-large{margin-right:var(--size-large)}.mr-xlarge{margin-right:var(--size-xlarge)}.mr-xxlarge{margin-right:var(--size-xxlarge)}.mr-huge{margin-right:var(--size-huge)}.mb-xxxsmall{margin-bottom:var(--size-xxxsmall)}.mb-xxsmall{margin-bottom:var(--size-xxsmall)}.mb-xsmall{margin-bottom:var(--size-xsmall)}.mb-small{margin-bottom:var(--size-small)}.mb-medium{margin-bottom:var(--size-medium)}.mb-large{margin-bottom:var(--size-large)}.mb-xlarge{margin-bottom:var(--size-xlarge)}.mb-xxlarge{margin-bottom:var(--size-xxlarge)}.mb-huge{margin-bottom:var(--size-huge)}.ml-xxxsmall{margin-left:var(--size-xxxsmall)}.ml-xxsmall{margin-left:var(--size-xxsmall)}.ml-xsmall{margin-left:var(--size-xsmall)}.ml-small{margin-left:var(--size-small)}.ml-medium{margin-left:var(--size-medium)}.ml-large{margin-left:var(--size-large)}.ml-xlarge{margin-left:var(--size-xlarge)}.ml-xxlarge{margin-left:var(--size-xxlarge)}.ml-huge{margin-left:var(--size-huge)}.hidden{display:none}.inline{display:inline}.block{display:block}.inline-block{display:inline-block}.flex{display:flex}.inline-flex{display:inline-flex}.column{flex-direction:column}.column-reverse{flex-direction:column-reverse}.row{flex-direction:row}.row-reverse{flex-direction:row-reverse}.flex-wrap{flex-wrap:wrap}.flex-wrap-reverse{flex-wrap:wrap-reverse}.flex-no-wrap{flex-wrap:nowrap}.flex-shrink{flex-shrink:1}.flex-no-shrink{flex-shrink:0}.flex-grow{flex-grow:1}.flex-no-grow{flex-grow:0}.justify-content-start{justify-content:flex-start}.justify-content-end{justify-content:flex-end}.justify-content-center{justify-content:center}.justify-content-between{justify-content:space-between}.justify-content-around{justify-content:space-around}.align-items-start{align-items:flex-start}.align-items-end{align-items:flex-end}.align-items-center{align-items:center}.align-items-stretch{align-items:stretch}.align-content-start{align-content:flex-start}.align-content-end{align-content:flex-end}.align-content-center{align-content:center}.align-content-stretch{align-content:stretch}.align-self-start{align-self:flex-start}.align-self-end{align-self:flex-end}.align-self-center{align-self:center}.align-self-stretch{align-self:stretch}";
+    styleInject(css_248z);
+
+    const subscriber_queue = [];
+    /**
+     * Creates a `Readable` store that allows reading by subscription.
+     * @param value initial value
+     * @param {StartStopNotifier}start start and stop notifications for subscriptions
+     */
+    function readable(value, start) {
+        return {
+            subscribe: writable(value, start).subscribe
+        };
+    }
+    /**
+     * Create a `Writable` store that allows both updating and reading by subscription.
+     * @param {*=}value initial value
+     * @param {StartStopNotifier=}start start and stop notifications for subscriptions
+     */
+    function writable(value, start = noop) {
+        let stop;
+        const subscribers = new Set();
+        function set(new_value) {
+            if (safe_not_equal(value, new_value)) {
+                value = new_value;
+                if (stop) { // store is ready
+                    const run_queue = !subscriber_queue.length;
+                    for (const subscriber of subscribers) {
+                        subscriber[1]();
+                        subscriber_queue.push(subscriber, value);
+                    }
+                    if (run_queue) {
+                        for (let i = 0; i < subscriber_queue.length; i += 2) {
+                            subscriber_queue[i][0](subscriber_queue[i + 1]);
+                        }
+                        subscriber_queue.length = 0;
+                    }
+                }
+            }
+        }
+        function update(fn) {
+            set(fn(value));
+        }
+        function subscribe(run, invalidate = noop) {
+            const subscriber = [run, invalidate];
+            subscribers.add(subscriber);
+            if (subscribers.size === 1) {
+                stop = start(set) || noop;
+            }
+            run(value);
+            return () => {
+                subscribers.delete(subscriber);
+                if (subscribers.size === 0) {
+                    stop();
+                    stop = null;
+                }
+            };
+        }
+        return { set, update, subscribe };
+    }
+
+    /* node_modules/figma-plugin-ds-svelte/src/components/Icon/index.svelte generated by Svelte v3.55.1 */
+
+    const file = "node_modules/figma-plugin-ds-svelte/src/components/Icon/index.svelte";
+
+    function add_css(target) {
+    	append_styles(target, "svelte-1fwferi", ".icon-component.svelte-1fwferi{display:flex;align-items:center;justify-content:center;cursor:default;width:var(--size-medium);height:var(--size-medium);font-family:var(--font-stack);font-size:var(--font-size-xsmall);user-select:none}.spin.svelte-1fwferi{animation:svelte-1fwferi-rotating 1.0s linear infinite}@keyframes svelte-1fwferi-rotating{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}.icon-component *{fill:inherit;color:inherit}\n/*# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiaW5kZXguc3ZlbHRlIiwic291cmNlcyI6WyJpbmRleC5zdmVsdGUiXSwic291cmNlc0NvbnRlbnQiOlsiPHNjcmlwdD5cbiAgICBleHBvcnQgbGV0IGljb25OYW1lID0gbnVsbDsgLy9wYXNzIHN2ZyBkYXRhIGludG8gdGhpcyB2YXIgYnkgaW1wb3J0aW5nIGFuIHN2ZyBpbiBwYXJlbnRcbiAgICBleHBvcnQgbGV0IHNwaW4gPSBmYWxzZTtcbiAgICBleHBvcnQgbGV0IGljb25UZXh0ID0gbnVsbDtcbiAgICBleHBvcnQgbGV0IGNvbG9yID0gJy0tZmlnbWEtY29sb3ItaWNvbic7XG4gICAgZXhwb3J0IHsgY2xhc3NOYW1lIGFzIGNsYXNzIH07XG5cbiAgICBsZXQgY2xhc3NOYW1lID0gJyc7XG5cbjwvc2NyaXB0PlxuXG48ZGl2IFxuICAgIGNsYXNzOnNwaW49e3NwaW59XG4gICAge2ljb25UZXh0fVxuICAgIHtpY29uTmFtZX0gXG4gICAgY2xhc3M9XCJpY29uLWNvbXBvbmVudCB7Y2xhc3NOYW1lfVwiXG4gICAgc3R5bGU9XCJjb2xvcjogdmFyKHtjb2xvcn0pOyBmaWxsOiB2YXIoe2NvbG9yfSlcIlxuICAgIG9uOmNsaWNrPlxuICAgIHsjaWYgaWNvblRleHR9XG4gICAgICAgIHtpY29uVGV4dH1cbiAgICB7OmVsc2V9XG4gICAgICAgIHtAaHRtbCBpY29uTmFtZX1cbiAgICB7L2lmfVxuPC9kaXY+XG5cbjxzdHlsZT5cblxuICAgIC5pY29uLWNvbXBvbmVudCB7XG4gICAgICAgIGRpc3BsYXk6IGZsZXg7XG4gICAgICAgIGFsaWduLWl0ZW1zOiBjZW50ZXI7XG4gICAgICAgIGp1c3RpZnktY29udGVudDogY2VudGVyO1xuICAgICAgICBjdXJzb3I6IGRlZmF1bHQ7XG4gICAgICAgIHdpZHRoOiB2YXIoLS1zaXplLW1lZGl1bSk7XG4gICAgICAgIGhlaWdodDogdmFyKC0tc2l6ZS1tZWRpdW0pO1xuICAgICAgICBmb250LWZhbWlseTogdmFyKC0tZm9udC1zdGFjayk7XG4gICAgICAgIGZvbnQtc2l6ZTogdmFyKC0tZm9udC1zaXplLXhzbWFsbCk7XG4gICAgICAgIHVzZXItc2VsZWN0OiBub25lO1xuICAgIH1cblxuICAgIC5zcGluIHtcbiAgICAgICAgYW5pbWF0aW9uOiByb3RhdGluZyAxLjBzIGxpbmVhciBpbmZpbml0ZTtcbiAgICB9XG5cbiAgICBAa2V5ZnJhbWVzIHJvdGF0aW5nIHtcbiAgICAgICAgZnJvbSB7XG4gICAgICAgICAgICB0cmFuc2Zvcm06IHJvdGF0ZSgwZGVnKTtcbiAgICAgICAgfVxuICAgICAgICB0byB7XG4gICAgICAgICAgICB0cmFuc2Zvcm06IHJvdGF0ZSgzNjBkZWcpO1xuICAgICAgICB9XG4gICAgfVxuXG4gICAgOmdsb2JhbCguaWNvbi1jb21wb25lbnQgKikge1xuICAgICAgICBmaWxsOiBpbmhlcml0O1xuICAgICAgICBjb2xvcjogaW5oZXJpdDtcbiAgICB9XG5cbjwvc3R5bGU+Il0sIm5hbWVzIjpbXSwibWFwcGluZ3MiOiJBQTJCSSxlQUFlLGVBQUMsQ0FBQyxBQUNiLE9BQU8sQ0FBRSxJQUFJLENBQ2IsV0FBVyxDQUFFLE1BQU0sQ0FDbkIsZUFBZSxDQUFFLE1BQU0sQ0FDdkIsTUFBTSxDQUFFLE9BQU8sQ0FDZixLQUFLLENBQUUsSUFBSSxhQUFhLENBQUMsQ0FDekIsTUFBTSxDQUFFLElBQUksYUFBYSxDQUFDLENBQzFCLFdBQVcsQ0FBRSxJQUFJLFlBQVksQ0FBQyxDQUM5QixTQUFTLENBQUUsSUFBSSxrQkFBa0IsQ0FBQyxDQUNsQyxXQUFXLENBQUUsSUFBSSxBQUNyQixDQUFDLEFBRUQsS0FBSyxlQUFDLENBQUMsQUFDSCxTQUFTLENBQUUsdUJBQVEsQ0FBQyxJQUFJLENBQUMsTUFBTSxDQUFDLFFBQVEsQUFDNUMsQ0FBQyxBQUVELFdBQVcsdUJBQVMsQ0FBQyxBQUNqQixJQUFJLEFBQUMsQ0FBQyxBQUNGLFNBQVMsQ0FBRSxPQUFPLElBQUksQ0FBQyxBQUMzQixDQUFDLEFBQ0QsRUFBRSxBQUFDLENBQUMsQUFDQSxTQUFTLENBQUUsT0FBTyxNQUFNLENBQUMsQUFDN0IsQ0FBQyxBQUNMLENBQUMsQUFFTyxpQkFBaUIsQUFBRSxDQUFDLEFBQ3hCLElBQUksQ0FBRSxPQUFPLENBQ2IsS0FBSyxDQUFFLE9BQU8sQUFDbEIsQ0FBQyJ9 */");
+    }
+
+    // (21:4) {:else}
+    function create_else_block(ctx) {
+    	let html_tag;
+    	let html_anchor;
+
+    	const block = {
+    		c: function create() {
+    			html_tag = new HtmlTag(false);
+    			html_anchor = empty();
+    			html_tag.a = html_anchor;
+    		},
+    		m: function mount(target, anchor) {
+    			html_tag.m(/*iconName*/ ctx[0], target, anchor);
+    			insert_dev(target, html_anchor, anchor);
+    		},
+    		p: function update(ctx, dirty) {
+    			if (dirty & /*iconName*/ 1) html_tag.p(/*iconName*/ ctx[0]);
+    		},
+    		d: function destroy(detaching) {
+    			if (detaching) detach_dev(html_anchor);
+    			if (detaching) html_tag.d();
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_else_block.name,
+    		type: "else",
+    		source: "(21:4) {:else}",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    // (19:4) {#if iconText}
+    function create_if_block(ctx) {
+    	let t;
+
+    	const block = {
+    		c: function create() {
+    			t = text(/*iconText*/ ctx[2]);
+    		},
+    		m: function mount(target, anchor) {
+    			insert_dev(target, t, anchor);
+    		},
+    		p: function update(ctx, dirty) {
+    			if (dirty & /*iconText*/ 4) set_data_dev(t, /*iconText*/ ctx[2]);
+    		},
+    		d: function destroy(detaching) {
+    			if (detaching) detach_dev(t);
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_if_block.name,
+    		type: "if",
+    		source: "(19:4) {#if iconText}",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    function create_fragment(ctx) {
+    	let div;
+    	let div_class_value;
+    	let mounted;
+    	let dispose;
+
+    	function select_block_type(ctx, dirty) {
+    		if (/*iconText*/ ctx[2]) return create_if_block;
+    		return create_else_block;
+    	}
+
+    	let current_block_type = select_block_type(ctx);
+    	let if_block = current_block_type(ctx);
+
+    	const block = {
+    		c: function create() {
+    			div = element("div");
+    			if_block.c();
+    			attr_dev(div, "icontext", /*iconText*/ ctx[2]);
+    			attr_dev(div, "iconname", /*iconName*/ ctx[0]);
+    			attr_dev(div, "class", div_class_value = "icon-component " + /*className*/ ctx[4] + " svelte-1fwferi");
+    			set_style(div, "color", "var(" + /*color*/ ctx[3] + ")");
+    			set_style(div, "fill", "var(" + /*color*/ ctx[3] + ")");
+    			toggle_class(div, "spin", /*spin*/ ctx[1]);
+    			add_location(div, file, 11, 0, 279);
+    		},
+    		l: function claim(nodes) {
+    			throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
+    		},
+    		m: function mount(target, anchor) {
+    			insert_dev(target, div, anchor);
+    			if_block.m(div, null);
+
+    			if (!mounted) {
+    				dispose = listen_dev(div, "click", /*click_handler*/ ctx[5], false, false, false);
+    				mounted = true;
+    			}
+    		},
+    		p: function update(ctx, [dirty]) {
+    			if (current_block_type === (current_block_type = select_block_type(ctx)) && if_block) {
+    				if_block.p(ctx, dirty);
+    			} else {
+    				if_block.d(1);
+    				if_block = current_block_type(ctx);
+
+    				if (if_block) {
+    					if_block.c();
+    					if_block.m(div, null);
+    				}
+    			}
+
+    			if (dirty & /*iconText*/ 4) {
+    				attr_dev(div, "icontext", /*iconText*/ ctx[2]);
+    			}
+
+    			if (dirty & /*iconName*/ 1) {
+    				attr_dev(div, "iconname", /*iconName*/ ctx[0]);
+    			}
+
+    			if (dirty & /*className*/ 16 && div_class_value !== (div_class_value = "icon-component " + /*className*/ ctx[4] + " svelte-1fwferi")) {
+    				attr_dev(div, "class", div_class_value);
+    			}
+
+    			if (dirty & /*color*/ 8) {
+    				set_style(div, "color", "var(" + /*color*/ ctx[3] + ")");
+    			}
+
+    			if (dirty & /*color*/ 8) {
+    				set_style(div, "fill", "var(" + /*color*/ ctx[3] + ")");
+    			}
+
+    			if (dirty & /*className, spin*/ 18) {
+    				toggle_class(div, "spin", /*spin*/ ctx[1]);
+    			}
+    		},
+    		i: noop,
+    		o: noop,
+    		d: function destroy(detaching) {
+    			if (detaching) detach_dev(div);
+    			if_block.d();
+    			mounted = false;
+    			dispose();
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_fragment.name,
+    		type: "component",
+    		source: "",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    function instance($$self, $$props, $$invalidate) {
+    	let { $$slots: slots = {}, $$scope } = $$props;
+    	validate_slots('Icon', slots, []);
+    	let { iconName = null } = $$props;
+    	let { spin = false } = $$props;
+    	let { iconText = null } = $$props;
+    	let { color = '--figma-color-icon' } = $$props;
+    	let { class: className = '' } = $$props;
+    	const writable_props = ['iconName', 'spin', 'iconText', 'color', 'class'];
+
+    	Object.keys($$props).forEach(key => {
+    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== '$$' && key !== 'slot') console.warn(`<Icon> was created with unknown prop '${key}'`);
+    	});
+
+    	function click_handler(event) {
+    		bubble.call(this, $$self, event);
+    	}
+
+    	$$self.$$set = $$props => {
+    		if ('iconName' in $$props) $$invalidate(0, iconName = $$props.iconName);
+    		if ('spin' in $$props) $$invalidate(1, spin = $$props.spin);
+    		if ('iconText' in $$props) $$invalidate(2, iconText = $$props.iconText);
+    		if ('color' in $$props) $$invalidate(3, color = $$props.color);
+    		if ('class' in $$props) $$invalidate(4, className = $$props.class);
+    	};
+
+    	$$self.$capture_state = () => ({
+    		iconName,
+    		spin,
+    		iconText,
+    		color,
+    		className
+    	});
+
+    	$$self.$inject_state = $$props => {
+    		if ('iconName' in $$props) $$invalidate(0, iconName = $$props.iconName);
+    		if ('spin' in $$props) $$invalidate(1, spin = $$props.spin);
+    		if ('iconText' in $$props) $$invalidate(2, iconText = $$props.iconText);
+    		if ('color' in $$props) $$invalidate(3, color = $$props.color);
+    		if ('className' in $$props) $$invalidate(4, className = $$props.className);
+    	};
+
+    	if ($$props && "$$inject" in $$props) {
+    		$$self.$inject_state($$props.$$inject);
+    	}
+
+    	return [iconName, spin, iconText, color, className, click_handler];
+    }
+
+    class Icon extends SvelteComponentDev {
+    	constructor(options) {
+    		super(options);
+
+    		init(
+    			this,
+    			options,
+    			instance,
+    			create_fragment,
+    			safe_not_equal,
+    			{
+    				iconName: 0,
+    				spin: 1,
+    				iconText: 2,
+    				color: 3,
+    				class: 4
+    			},
+    			add_css
+    		);
+
+    		dispatch_dev("SvelteRegisterComponent", {
+    			component: this,
+    			tagName: "Icon",
+    			options,
+    			id: create_fragment.name
+    		});
+    	}
+
+    	get iconName() {
+    		throw new Error("<Icon>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	set iconName(value) {
+    		throw new Error("<Icon>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	get spin() {
+    		throw new Error("<Icon>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	set spin(value) {
+    		throw new Error("<Icon>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	get iconText() {
+    		throw new Error("<Icon>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	set iconText(value) {
+    		throw new Error("<Icon>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	get color() {
+    		throw new Error("<Icon>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	set color(value) {
+    		throw new Error("<Icon>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	get class() {
+    		throw new Error("<Icon>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	set class(value) {
+    		throw new Error("<Icon>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+    }
+
+    /* node_modules/figma-plugin-ds-svelte/src/components/Label/index.svelte generated by Svelte v3.55.1 */
+
+    const file$1 = "node_modules/figma-plugin-ds-svelte/src/components/Label/index.svelte";
+
+    function add_css$1(target) {
+    	append_styles(target, "svelte-4x0x82", "div.svelte-4x0x82{font-size:var(--font-size-xsmall);font-weight:var(--font-weight-normal);letter-spacing:var( --font-letter-spacing-pos-xsmall);line-height:var(--line-height);color:var(--figma-color-text-secondary);height:var(--size-medium);width:100%;display:flex;align-items:center;cursor:default;user-select:none;padding:0 calc(var(--size-xxsmall) / 2) 0 var(--size-xxsmall)}\n/*# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiaW5kZXguc3ZlbHRlIiwic291cmNlcyI6WyJpbmRleC5zdmVsdGUiXSwic291cmNlc0NvbnRlbnQiOlsiPHNjcmlwdD5cblxuICAgIGV4cG9ydCB7IGNsYXNzTmFtZSBhcyBjbGFzcyB9O1xuICAgIGxldCBjbGFzc05hbWUgPSAnJztcblxuPC9zY3JpcHQ+XG5cbjxkaXYgY2xhc3M9XCJ7Y2xhc3NOYW1lfVwiPlxuICAgIDxzbG90Pjwvc2xvdD5cbjwvZGl2PlxuXG48c3R5bGU+XG5cbiAgICBkaXYge1xuICAgICAgICBmb250LXNpemU6IHZhcigtLWZvbnQtc2l6ZS14c21hbGwpO1xuICAgICAgICBmb250LXdlaWdodDogdmFyKC0tZm9udC13ZWlnaHQtbm9ybWFsKTtcbiAgICAgICAgbGV0dGVyLXNwYWNpbmc6IHZhciggLS1mb250LWxldHRlci1zcGFjaW5nLXBvcy14c21hbGwpO1xuICAgICAgICBsaW5lLWhlaWdodDogdmFyKC0tbGluZS1oZWlnaHQpO1xuICAgICAgICBjb2xvcjogdmFyKC0tZmlnbWEtY29sb3ItdGV4dC1zZWNvbmRhcnkpO1xuICAgICAgICBoZWlnaHQ6IHZhcigtLXNpemUtbWVkaXVtKTtcbiAgICAgICAgd2lkdGg6IDEwMCU7XG4gICAgICAgIGRpc3BsYXk6IGZsZXg7XG4gICAgICAgIGFsaWduLWl0ZW1zOiBjZW50ZXI7XG4gICAgICAgIGN1cnNvcjogZGVmYXVsdDtcbiAgICAgICAgdXNlci1zZWxlY3Q6IG5vbmU7XG4gICAgICAgIHBhZGRpbmc6IDAgY2FsYyh2YXIoLS1zaXplLXh4c21hbGwpIC8gMikgMCB2YXIoLS1zaXplLXh4c21hbGwpO1xuICAgIH1cblxuPC9zdHlsZT4iXSwibmFtZXMiOltdLCJtYXBwaW5ncyI6IkFBYUksR0FBRyxjQUFDLENBQUMsQUFDRCxTQUFTLENBQUUsSUFBSSxrQkFBa0IsQ0FBQyxDQUNsQyxXQUFXLENBQUUsSUFBSSxvQkFBb0IsQ0FBQyxDQUN0QyxjQUFjLENBQUUsS0FBSyxnQ0FBZ0MsQ0FBQyxDQUN0RCxXQUFXLENBQUUsSUFBSSxhQUFhLENBQUMsQ0FDL0IsS0FBSyxDQUFFLElBQUksNEJBQTRCLENBQUMsQ0FDeEMsTUFBTSxDQUFFLElBQUksYUFBYSxDQUFDLENBQzFCLEtBQUssQ0FBRSxJQUFJLENBQ1gsT0FBTyxDQUFFLElBQUksQ0FDYixXQUFXLENBQUUsTUFBTSxDQUNuQixNQUFNLENBQUUsT0FBTyxDQUNmLFdBQVcsQ0FBRSxJQUFJLENBQ2pCLE9BQU8sQ0FBRSxDQUFDLENBQUMsS0FBSyxJQUFJLGNBQWMsQ0FBQyxDQUFDLENBQUMsQ0FBQyxDQUFDLENBQUMsQ0FBQyxDQUFDLENBQUMsSUFBSSxjQUFjLENBQUMsQUFDbEUsQ0FBQyJ9 */");
+    }
+
+    function create_fragment$1(ctx) {
+    	let div;
+    	let div_class_value;
+    	let current;
+    	const default_slot_template = /*#slots*/ ctx[2].default;
+    	const default_slot = create_slot(default_slot_template, ctx, /*$$scope*/ ctx[1], null);
+
+    	const block = {
+    		c: function create() {
+    			div = element("div");
+    			if (default_slot) default_slot.c();
+    			attr_dev(div, "class", div_class_value = "" + (null_to_empty(/*className*/ ctx[0]) + " svelte-4x0x82"));
+    			add_location(div, file$1, 7, 0, 81);
+    		},
+    		l: function claim(nodes) {
+    			throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
+    		},
+    		m: function mount(target, anchor) {
+    			insert_dev(target, div, anchor);
+
+    			if (default_slot) {
+    				default_slot.m(div, null);
+    			}
+
+    			current = true;
+    		},
+    		p: function update(ctx, [dirty]) {
+    			if (default_slot) {
+    				if (default_slot.p && (!current || dirty & /*$$scope*/ 2)) {
+    					update_slot_base(
+    						default_slot,
+    						default_slot_template,
+    						ctx,
+    						/*$$scope*/ ctx[1],
+    						!current
+    						? get_all_dirty_from_scope(/*$$scope*/ ctx[1])
+    						: get_slot_changes(default_slot_template, /*$$scope*/ ctx[1], dirty, null),
+    						null
+    					);
+    				}
+    			}
+
+    			if (!current || dirty & /*className*/ 1 && div_class_value !== (div_class_value = "" + (null_to_empty(/*className*/ ctx[0]) + " svelte-4x0x82"))) {
+    				attr_dev(div, "class", div_class_value);
+    			}
+    		},
+    		i: function intro(local) {
+    			if (current) return;
+    			transition_in(default_slot, local);
+    			current = true;
+    		},
+    		o: function outro(local) {
+    			transition_out(default_slot, local);
+    			current = false;
+    		},
+    		d: function destroy(detaching) {
+    			if (detaching) detach_dev(div);
+    			if (default_slot) default_slot.d(detaching);
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_fragment$1.name,
+    		type: "component",
+    		source: "",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    function instance$1($$self, $$props, $$invalidate) {
+    	let { $$slots: slots = {}, $$scope } = $$props;
+    	validate_slots('Label', slots, ['default']);
+    	let { class: className = '' } = $$props;
+    	const writable_props = ['class'];
+
+    	Object.keys($$props).forEach(key => {
+    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== '$$' && key !== 'slot') console.warn(`<Label> was created with unknown prop '${key}'`);
+    	});
+
+    	$$self.$$set = $$props => {
+    		if ('class' in $$props) $$invalidate(0, className = $$props.class);
+    		if ('$$scope' in $$props) $$invalidate(1, $$scope = $$props.$$scope);
+    	};
+
+    	$$self.$capture_state = () => ({ className });
+
+    	$$self.$inject_state = $$props => {
+    		if ('className' in $$props) $$invalidate(0, className = $$props.className);
+    	};
+
+    	if ($$props && "$$inject" in $$props) {
+    		$$self.$inject_state($$props.$$inject);
+    	}
+
+    	return [className, $$scope, slots];
+    }
+
+    class Label extends SvelteComponentDev {
+    	constructor(options) {
+    		super(options);
+    		init(this, options, instance$1, create_fragment$1, safe_not_equal, { class: 0 }, add_css$1);
+
+    		dispatch_dev("SvelteRegisterComponent", {
+    			component: this,
+    			tagName: "Label",
+    			options,
+    			id: create_fragment$1.name
+    		});
+    	}
+
+    	get class() {
+    		throw new Error("<Label>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	set class(value) {
+    		throw new Error("<Label>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+    }
+
+    var IconHorizontalPadding = "<svg fill=\"none\" height=\"32\" viewBox=\"0 0 32 32\" width=\"32\" xmlns=\"http://www.w3.org/2000/svg\"><g fill=\"#000\"><path d=\"m9 9v14h1v-14zm13 0v14h1v-14z\"/><path clip-rule=\"evenodd\" d=\"m13 19v-6h6v6zm-1-7h8v8h-8z\" fill-rule=\"evenodd\"/></g></svg>";
+
+    /* src/components/button.svelte generated by Svelte v3.55.1 */
+    const file$2 = "src/components/button.svelte";
+
+    function add_css$2(target) {
+    	append_styles(target, "svelte-1o5ow20", "button.svelte-1o5ow20{display:flex;align-items:center;border-radius:var(--border-radius-large);color:var(--figma-color-text-onbrand);flex-shrink:0;font-family:var(--font-stack);font-size:var(--font-size-xsmall);font-weight:var(--font-weight-medium);letter-spacing:var(--font-letter-spacing-neg-small);line-height:var(--font-line-height);height:var(--size-medium);padding:0 var(--size-xsmall) 0 var(--size-xsmall);text-decoration:none;outline:none;border:2px solid transparent;user-select:none}.full-width.svelte-1o5ow20{display:inherit;text-align:center;width:100%}.primary.svelte-1o5ow20{background-color:var(--figma-color-bg-brand);color:var(--figma-color-text-onbrand)}.primary.svelte-1o5ow20:enabled:active,.primary.svelte-1o5ow20:enabled:focus{border:2px solid var(--figma-color-border-brand-strong)}.primary.svelte-1o5ow20:disabled{background-color:var(--figma-color-bg-disabled);color:var(--figma-color-text-disabled)}.primary.destructive.svelte-1o5ow20{background-color:var(--figma-color-bg-danger)}.primary.destructive.svelte-1o5ow20:active,.primary.destructive.svelte-1o5ow20:focus{border:2px solid var(--figma-color-border-disabled-strong)}.primary.destructive.svelte-1o5ow20:disabled{background-color:var(--figma-color-bg-disabled)}.secondary.svelte-1o5ow20{background-color:transparent;border:1px solid var(--figma-color-border-strong);color:var(--figma-color-text);padding:0 calc(var(--size-xsmall) + 1px) 0 calc(var(--size-xsmall) + 1px);letter-spacing:var(--font-letter-spacing-pos-small)}.secondary.svelte-1o5ow20:enabled:active,.secondary.svelte-1o5ow20:enabled:focus{border:2px solid var(--figma-color-border-selected);padding:0 var(--size-xsmall) 0 var(--size-xsmall)}.secondary.svelte-1o5ow20:disabled{border:1px solid var(--figma-color-border-disabled-strong);color:var(--figma-color-text-disabled)}.secondary.destructive.svelte-1o5ow20{border-color:var(--figma-color-border-danger-strong);color:var(--figma-color-text-danger)}.secondary.destructive.svelte-1o5ow20:enabled:active,.secondary.destructive.svelte-1o5ow20:enabled:focus{border:2px solid var(--figma-color-border-danger-strong);padding:0 var(--size-xsmall) 0 var(--size-xsmall)}.secondary.destructive.svelte-1o5ow20:disabled{opacity:0.4}.tertiary.svelte-1o5ow20{border:1px solid transparent;color:var(--figma-color-text-brand);background:initial;padding:0;font-weight:var(--font-weight-normal);letter-spacing:var(--font-letter-spacing-pos-small);cursor:pointer}.tertiary.svelte-1o5ow20:enabled:focus{text-decoration:underline}.tertiary.svelte-1o5ow20:disabled{color:var(--figma-color-text-disabled)}.tertiary.destructive.svelte-1o5ow20{color:var(--figma-color-text-danger)}.tertiary.destructive.svelte-1o5ow20:enabled:focus{text-decoration:underline}.tertiary.destructive.svelte-1o5ow20:disabled{opacity:0.4}\n/*# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiYnV0dG9uLnN2ZWx0ZSIsInNvdXJjZXMiOlsiYnV0dG9uLnN2ZWx0ZSJdLCJzb3VyY2VzQ29udGVudCI6WyI8c2NyaXB0PlxuICBpbXBvcnQgeyBvbk1vdW50IH0gZnJvbSBcInN2ZWx0ZVwiO1xuXG4gIGV4cG9ydCBsZXQgdmFyaWFudCA9IFwicHJpbWFyeVwiO1xuICBleHBvcnQgbGV0IGRpc2FibGVkID0gZmFsc2U7XG4gIGV4cG9ydCBsZXQgZGVzdHJ1Y3RpdmUgPSBmYWxzZTtcbiAgZXhwb3J0IHsgY2xhc3NOYW1lIGFzIGNsYXNzIH07XG5cbiAgbGV0IGNsYXNzTmFtZSA9IFwiXCI7XG48L3NjcmlwdD5cblxuPGJ1dHRvblxuICBvbjpjbGlja1xuICBvbjpzdWJtaXR8cHJldmVudERlZmF1bHRcbiAgb25jbGljaz1cInRoaXMuYmx1cigpO1wiXG4gIHt2YXJpYW50fVxuICB7ZGlzYWJsZWR9XG4gIGNsYXNzOmRlc3RydWN0aXZlXG4gIGNsYXNzPVwie3ZhcmlhbnR9IHtjbGFzc05hbWV9XCJcbj5cbiAgPHNsb3QgLz5cbjwvYnV0dG9uPlxuXG48c3R5bGU+XG4gIGJ1dHRvbiB7XG4gICAgZGlzcGxheTogZmxleDtcbiAgICBhbGlnbi1pdGVtczogY2VudGVyO1xuICAgIGJvcmRlci1yYWRpdXM6IHZhcigtLWJvcmRlci1yYWRpdXMtbGFyZ2UpO1xuICAgIGNvbG9yOiB2YXIoLS1maWdtYS1jb2xvci10ZXh0LW9uYnJhbmQpO1xuICAgIGZsZXgtc2hyaW5rOiAwO1xuICAgIGZvbnQtZmFtaWx5OiB2YXIoLS1mb250LXN0YWNrKTtcbiAgICBmb250LXNpemU6IHZhcigtLWZvbnQtc2l6ZS14c21hbGwpO1xuICAgIGZvbnQtd2VpZ2h0OiB2YXIoLS1mb250LXdlaWdodC1tZWRpdW0pO1xuICAgIGxldHRlci1zcGFjaW5nOiB2YXIoLS1mb250LWxldHRlci1zcGFjaW5nLW5lZy1zbWFsbCk7XG4gICAgbGluZS1oZWlnaHQ6IHZhcigtLWZvbnQtbGluZS1oZWlnaHQpO1xuICAgIGhlaWdodDogdmFyKC0tc2l6ZS1tZWRpdW0pO1xuICAgIHBhZGRpbmc6IDAgdmFyKC0tc2l6ZS14c21hbGwpIDAgdmFyKC0tc2l6ZS14c21hbGwpO1xuICAgIHRleHQtZGVjb3JhdGlvbjogbm9uZTtcbiAgICBvdXRsaW5lOiBub25lO1xuICAgIGJvcmRlcjogMnB4IHNvbGlkIHRyYW5zcGFyZW50O1xuICAgIHVzZXItc2VsZWN0OiBub25lO1xuICB9XG4gIC5mdWxsLXdpZHRoIHtcbiAgICBkaXNwbGF5OiBpbmhlcml0O1xuICAgIHRleHQtYWxpZ246IGNlbnRlcjtcbiAgICB3aWR0aDogMTAwJTtcbiAgfVxuXG4gIC8qIFByaW1hcnkgc3R5bGVzICovXG4gIC5wcmltYXJ5IHtcbiAgICBiYWNrZ3JvdW5kLWNvbG9yOiB2YXIoLS1maWdtYS1jb2xvci1iZy1icmFuZCk7XG4gICAgY29sb3I6IHZhcigtLWZpZ21hLWNvbG9yLXRleHQtb25icmFuZCk7XG4gIH1cbiAgLnByaW1hcnk6ZW5hYmxlZDphY3RpdmUsXG4gIC5wcmltYXJ5OmVuYWJsZWQ6Zm9jdXMge1xuICAgIGJvcmRlcjogMnB4IHNvbGlkIHZhcigtLWZpZ21hLWNvbG9yLWJvcmRlci1icmFuZC1zdHJvbmcpO1xuICB9XG4gIC5wcmltYXJ5OmRpc2FibGVkIHtcbiAgICBiYWNrZ3JvdW5kLWNvbG9yOiB2YXIoLS1maWdtYS1jb2xvci1iZy1kaXNhYmxlZCk7XG4gICAgY29sb3I6IHZhcigtLWZpZ21hLWNvbG9yLXRleHQtZGlzYWJsZWQpO1xuICB9XG4gIC5wcmltYXJ5LmRlc3RydWN0aXZlIHtcbiAgICBiYWNrZ3JvdW5kLWNvbG9yOiB2YXIoLS1maWdtYS1jb2xvci1iZy1kYW5nZXIpO1xuICB9XG4gIC5wcmltYXJ5LmRlc3RydWN0aXZlOmFjdGl2ZSxcbiAgLnByaW1hcnkuZGVzdHJ1Y3RpdmU6Zm9jdXMge1xuICAgIGJvcmRlcjogMnB4IHNvbGlkIHZhcigtLWZpZ21hLWNvbG9yLWJvcmRlci1kaXNhYmxlZC1zdHJvbmcpO1xuICB9XG4gIC5wcmltYXJ5LmRlc3RydWN0aXZlOmRpc2FibGVkIHtcbiAgICBiYWNrZ3JvdW5kLWNvbG9yOiB2YXIoLS1maWdtYS1jb2xvci1iZy1kaXNhYmxlZCk7XG4gIH1cblxuICAvKiBTZWNvbmRhcnkgc3R5bGVzICovXG4gIC5zZWNvbmRhcnkge1xuICAgIGJhY2tncm91bmQtY29sb3I6IHRyYW5zcGFyZW50O1xuICAgIGJvcmRlcjogMXB4IHNvbGlkIHZhcigtLWZpZ21hLWNvbG9yLWJvcmRlci1zdHJvbmcpO1xuICAgIGNvbG9yOiB2YXIoLS1maWdtYS1jb2xvci10ZXh0KTtcbiAgICBwYWRkaW5nOiAwIGNhbGModmFyKC0tc2l6ZS14c21hbGwpICsgMXB4KSAwIGNhbGModmFyKC0tc2l6ZS14c21hbGwpICsgMXB4KTtcbiAgICBsZXR0ZXItc3BhY2luZzogdmFyKC0tZm9udC1sZXR0ZXItc3BhY2luZy1wb3Mtc21hbGwpO1xuICB9XG4gIC5zZWNvbmRhcnk6ZW5hYmxlZDphY3RpdmUsXG4gIC5zZWNvbmRhcnk6ZW5hYmxlZDpmb2N1cyB7XG4gICAgYm9yZGVyOiAycHggc29saWQgdmFyKC0tZmlnbWEtY29sb3ItYm9yZGVyLXNlbGVjdGVkKTtcbiAgICBwYWRkaW5nOiAwIHZhcigtLXNpemUteHNtYWxsKSAwIHZhcigtLXNpemUteHNtYWxsKTtcbiAgfVxuICAuc2Vjb25kYXJ5OmRpc2FibGVkIHtcbiAgICBib3JkZXI6IDFweCBzb2xpZCB2YXIoLS1maWdtYS1jb2xvci1ib3JkZXItZGlzYWJsZWQtc3Ryb25nKTtcbiAgICBjb2xvcjogdmFyKC0tZmlnbWEtY29sb3ItdGV4dC1kaXNhYmxlZCk7XG4gIH1cbiAgLnNlY29uZGFyeS5kZXN0cnVjdGl2ZSB7XG4gICAgLyogdGhpcyBzaG91bGQgYmUgZGVwcmVjYXRlZCAqL1xuICAgIGJvcmRlci1jb2xvcjogdmFyKC0tZmlnbWEtY29sb3ItYm9yZGVyLWRhbmdlci1zdHJvbmcpO1xuICAgIGNvbG9yOiB2YXIoLS1maWdtYS1jb2xvci10ZXh0LWRhbmdlcik7XG4gIH1cbiAgLnNlY29uZGFyeS5kZXN0cnVjdGl2ZTplbmFibGVkOmFjdGl2ZSxcbiAgLnNlY29uZGFyeS5kZXN0cnVjdGl2ZTplbmFibGVkOmZvY3VzIHtcbiAgICBib3JkZXI6IDJweCBzb2xpZCB2YXIoLS1maWdtYS1jb2xvci1ib3JkZXItZGFuZ2VyLXN0cm9uZyk7XG4gICAgcGFkZGluZzogMCB2YXIoLS1zaXplLXhzbWFsbCkgMCB2YXIoLS1zaXplLXhzbWFsbCk7XG4gIH1cbiAgLnNlY29uZGFyeS5kZXN0cnVjdGl2ZTpkaXNhYmxlZCB7XG4gICAgb3BhY2l0eTogMC40O1xuICB9XG5cbiAgLyogdGVydGlhcnkgc3R5bGVzICovXG4gIC50ZXJ0aWFyeSB7XG4gICAgYm9yZGVyOiAxcHggc29saWQgdHJhbnNwYXJlbnQ7XG4gICAgY29sb3I6IHZhcigtLWZpZ21hLWNvbG9yLXRleHQtYnJhbmQpO1xuICAgIGJhY2tncm91bmQ6IGluaXRpYWw7XG4gICAgcGFkZGluZzogMDtcbiAgICBmb250LXdlaWdodDogdmFyKC0tZm9udC13ZWlnaHQtbm9ybWFsKTtcbiAgICBsZXR0ZXItc3BhY2luZzogdmFyKC0tZm9udC1sZXR0ZXItc3BhY2luZy1wb3Mtc21hbGwpO1xuICAgIGN1cnNvcjogcG9pbnRlcjtcbiAgfVxuICAudGVydGlhcnk6ZW5hYmxlZDpmb2N1cyB7XG4gICAgdGV4dC1kZWNvcmF0aW9uOiB1bmRlcmxpbmU7XG4gIH1cbiAgLnRlcnRpYXJ5OmRpc2FibGVkIHtcbiAgICBjb2xvcjogdmFyKC0tZmlnbWEtY29sb3ItdGV4dC1kaXNhYmxlZCk7XG4gIH1cbiAgLnRlcnRpYXJ5LmRlc3RydWN0aXZlIHtcbiAgICBjb2xvcjogdmFyKC0tZmlnbWEtY29sb3ItdGV4dC1kYW5nZXIpO1xuICB9XG4gIC50ZXJ0aWFyeS5kZXN0cnVjdGl2ZTplbmFibGVkOmZvY3VzIHtcbiAgICB0ZXh0LWRlY29yYXRpb246IHVuZGVybGluZTtcbiAgfVxuICAudGVydGlhcnkuZGVzdHJ1Y3RpdmU6ZGlzYWJsZWQge1xuICAgIG9wYWNpdHk6IDAuNDtcbiAgfVxuPC9zdHlsZT5cbiJdLCJuYW1lcyI6W10sIm1hcHBpbmdzIjoiQUF3QkUsTUFBTSxlQUFDLENBQUMsQUFDTixPQUFPLENBQUUsSUFBSSxDQUNiLFdBQVcsQ0FBRSxNQUFNLENBQ25CLGFBQWEsQ0FBRSxJQUFJLHFCQUFxQixDQUFDLENBQ3pDLEtBQUssQ0FBRSxJQUFJLDBCQUEwQixDQUFDLENBQ3RDLFdBQVcsQ0FBRSxDQUFDLENBQ2QsV0FBVyxDQUFFLElBQUksWUFBWSxDQUFDLENBQzlCLFNBQVMsQ0FBRSxJQUFJLGtCQUFrQixDQUFDLENBQ2xDLFdBQVcsQ0FBRSxJQUFJLG9CQUFvQixDQUFDLENBQ3RDLGNBQWMsQ0FBRSxJQUFJLCtCQUErQixDQUFDLENBQ3BELFdBQVcsQ0FBRSxJQUFJLGtCQUFrQixDQUFDLENBQ3BDLE1BQU0sQ0FBRSxJQUFJLGFBQWEsQ0FBQyxDQUMxQixPQUFPLENBQUUsQ0FBQyxDQUFDLElBQUksYUFBYSxDQUFDLENBQUMsQ0FBQyxDQUFDLElBQUksYUFBYSxDQUFDLENBQ2xELGVBQWUsQ0FBRSxJQUFJLENBQ3JCLE9BQU8sQ0FBRSxJQUFJLENBQ2IsTUFBTSxDQUFFLEdBQUcsQ0FBQyxLQUFLLENBQUMsV0FBVyxDQUM3QixXQUFXLENBQUUsSUFBSSxBQUNuQixDQUFDLEFBQ0QsV0FBVyxlQUFDLENBQUMsQUFDWCxPQUFPLENBQUUsT0FBTyxDQUNoQixVQUFVLENBQUUsTUFBTSxDQUNsQixLQUFLLENBQUUsSUFBSSxBQUNiLENBQUMsQUFHRCxRQUFRLGVBQUMsQ0FBQyxBQUNSLGdCQUFnQixDQUFFLElBQUksc0JBQXNCLENBQUMsQ0FDN0MsS0FBSyxDQUFFLElBQUksMEJBQTBCLENBQUMsQUFDeEMsQ0FBQyxBQUNELHVCQUFRLFFBQVEsT0FBTyxDQUN2Qix1QkFBUSxRQUFRLE1BQU0sQUFBQyxDQUFDLEFBQ3RCLE1BQU0sQ0FBRSxHQUFHLENBQUMsS0FBSyxDQUFDLElBQUksaUNBQWlDLENB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 */");
+    }
+
+    function create_fragment$2(ctx) {
+    	let button;
+    	let button_class_value;
+    	let current;
+    	let mounted;
+    	let dispose;
+    	const default_slot_template = /*#slots*/ ctx[5].default;
+    	const default_slot = create_slot(default_slot_template, ctx, /*$$scope*/ ctx[4], null);
+
+    	const block = {
+    		c: function create() {
+    			button = element("button");
+    			if (default_slot) default_slot.c();
+    			attr_dev(button, "onclick", "this.blur();");
+    			attr_dev(button, "variant", /*variant*/ ctx[0]);
+    			button.disabled = /*disabled*/ ctx[1];
+    			attr_dev(button, "class", button_class_value = "" + (/*variant*/ ctx[0] + " " + /*className*/ ctx[3] + " svelte-1o5ow20"));
+    			toggle_class(button, "destructive", /*destructive*/ ctx[2]);
+    			add_location(button, file$2, 11, 0, 212);
+    		},
+    		l: function claim(nodes) {
+    			throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
+    		},
+    		m: function mount(target, anchor) {
+    			insert_dev(target, button, anchor);
+
+    			if (default_slot) {
+    				default_slot.m(button, null);
+    			}
+
+    			current = true;
+
+    			if (!mounted) {
+    				dispose = [
+    					listen_dev(button, "click", /*click_handler*/ ctx[6], false, false, false),
+    					listen_dev(button, "submit", prevent_default(/*submit_handler*/ ctx[7]), false, true, false)
+    				];
+
+    				mounted = true;
+    			}
+    		},
+    		p: function update(ctx, [dirty]) {
+    			if (default_slot) {
+    				if (default_slot.p && (!current || dirty & /*$$scope*/ 16)) {
+    					update_slot_base(
+    						default_slot,
+    						default_slot_template,
+    						ctx,
+    						/*$$scope*/ ctx[4],
+    						!current
+    						? get_all_dirty_from_scope(/*$$scope*/ ctx[4])
+    						: get_slot_changes(default_slot_template, /*$$scope*/ ctx[4], dirty, null),
+    						null
+    					);
+    				}
+    			}
+
+    			if (!current || dirty & /*variant*/ 1) {
+    				attr_dev(button, "variant", /*variant*/ ctx[0]);
+    			}
+
+    			if (!current || dirty & /*disabled*/ 2) {
+    				prop_dev(button, "disabled", /*disabled*/ ctx[1]);
+    			}
+
+    			if (!current || dirty & /*variant, className*/ 9 && button_class_value !== (button_class_value = "" + (/*variant*/ ctx[0] + " " + /*className*/ ctx[3] + " svelte-1o5ow20"))) {
+    				attr_dev(button, "class", button_class_value);
+    			}
+
+    			if (!current || dirty & /*variant, className, destructive*/ 13) {
+    				toggle_class(button, "destructive", /*destructive*/ ctx[2]);
+    			}
+    		},
+    		i: function intro(local) {
+    			if (current) return;
+    			transition_in(default_slot, local);
+    			current = true;
+    		},
+    		o: function outro(local) {
+    			transition_out(default_slot, local);
+    			current = false;
+    		},
+    		d: function destroy(detaching) {
+    			if (detaching) detach_dev(button);
+    			if (default_slot) default_slot.d(detaching);
+    			mounted = false;
+    			run_all(dispose);
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_fragment$2.name,
+    		type: "component",
+    		source: "",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    function instance$2($$self, $$props, $$invalidate) {
+    	let { $$slots: slots = {}, $$scope } = $$props;
+    	validate_slots('Button', slots, ['default']);
+    	let { variant = "primary" } = $$props;
+    	let { disabled = false } = $$props;
+    	let { destructive = false } = $$props;
+    	let { class: className = "" } = $$props;
+    	const writable_props = ['variant', 'disabled', 'destructive', 'class'];
+
+    	Object.keys($$props).forEach(key => {
+    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== '$$' && key !== 'slot') console.warn(`<Button> was created with unknown prop '${key}'`);
+    	});
+
+    	function click_handler(event) {
+    		bubble.call(this, $$self, event);
+    	}
+
+    	function submit_handler(event) {
+    		bubble.call(this, $$self, event);
+    	}
+
+    	$$self.$$set = $$props => {
+    		if ('variant' in $$props) $$invalidate(0, variant = $$props.variant);
+    		if ('disabled' in $$props) $$invalidate(1, disabled = $$props.disabled);
+    		if ('destructive' in $$props) $$invalidate(2, destructive = $$props.destructive);
+    		if ('class' in $$props) $$invalidate(3, className = $$props.class);
+    		if ('$$scope' in $$props) $$invalidate(4, $$scope = $$props.$$scope);
+    	};
+
+    	$$self.$capture_state = () => ({
+    		onMount,
+    		variant,
+    		disabled,
+    		destructive,
+    		className
+    	});
+
+    	$$self.$inject_state = $$props => {
+    		if ('variant' in $$props) $$invalidate(0, variant = $$props.variant);
+    		if ('disabled' in $$props) $$invalidate(1, disabled = $$props.disabled);
+    		if ('destructive' in $$props) $$invalidate(2, destructive = $$props.destructive);
+    		if ('className' in $$props) $$invalidate(3, className = $$props.className);
+    	};
+
+    	if ($$props && "$$inject" in $$props) {
+    		$$self.$inject_state($$props.$$inject);
+    	}
+
+    	return [
+    		variant,
+    		disabled,
+    		destructive,
+    		className,
+    		$$scope,
+    		slots,
+    		click_handler,
+    		submit_handler
+    	];
+    }
+
+    class Button extends SvelteComponentDev {
+    	constructor(options) {
+    		super(options);
+
+    		init(
+    			this,
+    			options,
+    			instance$2,
+    			create_fragment$2,
+    			safe_not_equal,
+    			{
+    				variant: 0,
+    				disabled: 1,
+    				destructive: 2,
+    				class: 3
+    			},
+    			add_css$2
+    		);
+
+    		dispatch_dev("SvelteRegisterComponent", {
+    			component: this,
+    			tagName: "Button",
+    			options,
+    			id: create_fragment$2.name
+    		});
+    	}
+
+    	get variant() {
+    		throw new Error("<Button>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	set variant(value) {
+    		throw new Error("<Button>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	get disabled() {
+    		throw new Error("<Button>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	set disabled(value) {
+    		throw new Error("<Button>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	get destructive() {
+    		throw new Error("<Button>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	set destructive(value) {
+    		throw new Error("<Button>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	get class() {
+    		throw new Error("<Button>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	set class(value) {
+    		throw new Error("<Button>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+    }
+
+    /* src/components/input-numbers.svelte generated by Svelte v3.55.1 */
+    const file$3 = "src/components/input-numbers.svelte";
+
+    function add_css$3(target) {
+    	append_styles(target, "svelte-13n8n0a", ".input.svelte-13n8n0a{position:relative;transition:flex 0s 0.2s}input.svelte-13n8n0a{font-size:var(--font-size-xsmall);font-weight:var(--font-weight-normal);letter-spacing:var(--font-letter-spacing-neg-xsmall);line-height:var(--line-height);position:relative;display:flex;overflow:visible;align-items:center;width:100%;height:30px;margin:1px 0 1px 0;padding:var(--size-xxsmall) var(--size-xxxsmall) var(--size-xxsmall)\n      var(--size-xxsmall);color:var(--figma-color-text);border:1px solid transparent;border-radius:var(--border-radius-small);outline:none;background-color:var(--figma-color-bg)}input.svelte-13n8n0a:hover,input.svelte-13n8n0a:placeholder-shown:hover{color:var(--figma-color-text-hover);border:1px solid var(--figma-color-border);background-image:none}input.svelte-13n8n0a::selection{color:var(--figma-color-text);background-color:var(--text-highlight)}input.svelte-13n8n0a::placeholder{color:var(--figma-color-text-tertiary);border:1px solid transparent}input.svelte-13n8n0a:placeholder-shown{color:var(--figma-color-text);border:1px solid var(--figma-color-border);background-image:none}input.svelte-13n8n0a:focus:placeholder-shown{border:1px solid var(--figma-color-border-selected);outline:1px solid var(--figma-color-border-selected);outline-offset:-2px}input.svelte-13n8n0a:disabled:hover{border:1px solid transparent}input.svelte-13n8n0a:active,input.svelte-13n8n0a:focus{color:var(--figma-color-text);border:1px solid var(--figma-color-border-selected);outline:1px solid var(--figma-color-border-selected);outline-offset:-2px}input.svelte-13n8n0a:disabled{position:relative;color:var(--figma-color-text-disabled);background-image:none}input.svelte-13n8n0a:disabled:active{outline:none}.borders.svelte-13n8n0a{border:1px solid var(--figma-color-border);background-image:none}.borders.svelte-13n8n0a:disabled{border:1px solid transparent;background-image:none}.borders.svelte-13n8n0a:disabled:placeholder-shown{border:1px solid transparent;background-image:none}.borders.svelte-13n8n0a:disabled:placeholder-shown:active{border:1px solid transparent;outline:none}.borders.svelte-13n8n0a:placeholder-shown{border:1px solid var(--figma-color-border);background-image:none}.indent.svelte-13n8n0a{padding-left:32px}.invalid.svelte-13n8n0a,.invalid.svelte-13n8n0a:hover,.invalid.svelte-13n8n0a:focus{border:1px solid var(--figma-color-border-danger-strong);outline:1px solid var(--figma-color-border-danger-strong);outline-offset:-2px}.icon.svelte-13n8n0a{position:absolute;top:-1px;left:0;width:var(--size-medium);height:var(--size-medium);z-index:1}.error.svelte-13n8n0a{color:var(--figma-color-text-danger);font-size:var(--font-size-xsmall);font-weight:var(--font-weight-normal);letter-spacing:var(--font-letter-spacing-neg-xsmall);line-height:var(--line-height);padding-top:var(--size-xxxsmall);padding-left:var(--size-xxsmall)}\n/*# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiaW5wdXQtbnVtYmVycy5zdmVsdGUiLCJzb3VyY2VzIjpbImlucHV0LW51bWJlcnMuc3ZlbHRlIl0sInNvdXJjZXNDb250ZW50IjpbIjxzY3JpcHQ+XG4gIGltcG9ydCBJY29uIGZyb20gXCJmaWdtYS1wbHVnaW4tZHMtc3ZlbHRlL3NyYy9jb21wb25lbnRzL0ljb24vaW5kZXguc3ZlbHRlXCI7XG5cbiAgZXhwb3J0IGxldCBpZCA9IG51bGw7XG4gIGV4cG9ydCBsZXQgdmFsdWUgPSBudWxsO1xuICBleHBvcnQgbGV0IG5hbWUgPSBudWxsO1xuICBleHBvcnQgbGV0IGljb25UZXh0ID0gbnVsbDtcbiAgZXhwb3J0IGxldCBib3JkZXJzID0gZmFsc2U7XG4gIGV4cG9ydCBsZXQgZGlzYWJsZWQgPSBmYWxzZTtcbiAgZXhwb3J0IGxldCBpY29uTmFtZSA9IG51bGw7XG4gIGV4cG9ydCBsZXQgc3BpbiA9IGZhbHNlO1xuICBleHBvcnQgbGV0IGludmFsaWQgPSBmYWxzZTtcbiAgZXhwb3J0IGxldCBlcnJvck1lc3NhZ2UgPSBcIkVycm9yIG1lc3NhZ2VcIjtcbiAgZXhwb3J0IGxldCBwbGFjZWhvbGRlciA9IFwiSW5wdXQgc29tZXRoaW5nIGhlcmUuLi5cIjtcbiAgZXhwb3J0IGxldCBtaW4gPSAyNDtcbiAgZXhwb3J0IGxldCBtYXggPSAxMDI0O1xuICBleHBvcnQgeyBjbGFzc05hbWUgYXMgY2xhc3MgfTtcblxuICBsZXQgY2xhc3NOYW1lID0gXCJcIjtcbjwvc2NyaXB0PlxuXG57I2lmIGljb25OYW1lIHx8IGljb25UZXh0fVxuICA8ZGl2IGNsYXNzPVwiaW5wdXQge2NsYXNzTmFtZX1cIj5cbiAgICA8ZGl2IGNsYXNzPVwiaWNvblwiPlxuICAgICAgPEljb24ge2ljb25OYW1lfSB7aWNvblRleHR9IHtzcGlufSBjb2xvcj1cIi0tZmlnbWEtY29sb3ItaWNvblwiIC8+XG4gICAgPC9kaXY+XG4gICAgPGlucHV0XG4gICAgICB0eXBlPVwibnVtYmVyXCJcbiAgICAgIG9uOmlucHV0XG4gICAgICBvbjpjaGFuZ2VcbiAgICAgIG9uOmtleWRvd25cbiAgICAgIG9uOmZvY3VzXG4gICAgICBvbjpibHVyXG4gICAgICBiaW5kOnZhbHVlXG4gICAgICB7aWR9XG4gICAgICB7bmFtZX1cbiAgICAgIHtkaXNhYmxlZH1cbiAgICAgIHtwbGFjZWhvbGRlcn1cbiAgICAgIHtlcnJvck1lc3NhZ2V9XG4gICAgICBjbGFzcz1cImluZGVudFwiXG4gICAgICBjbGFzczpib3JkZXJzXG4gICAgICBjbGFzczppbnZhbGlkXG4gICAgICB7bWlufVxuICAgICAge21heH1cbiAgICAvPlxuICAgIHsjaWYgaW52YWxpZH1cbiAgICAgIDxkaXYgY2xhc3M9XCJlcnJvclwiPlxuICAgICAgICB7ZXJyb3JNZXNzYWdlfVxuICAgICAgPC9kaXY+XG4gICAgey9pZn1cbiAgPC9kaXY+XG57OmVsc2V9XG4gIDxkaXYgY2xhc3M9XCJpbnB1dCB7Y2xhc3NOYW1lfVwiPlxuICAgIDxpbnB1dFxuICAgICAgdHlwZT1cIm51bWJlclwiXG4gICAgICBvbjppbnB1dFxuICAgICAgb246Y2hhbmdlXG4gICAgICBvbjprZXlkb3duXG4gICAgICBvbjpmb2N1c1xuICAgICAgb246Ymx1clxuICAgICAgYmluZDp2YWx1ZVxuICAgICAge2lkfVxuICAgICAge25hbWV9XG4gICAgICB7ZGlzYWJsZWR9XG4gICAgICB7cGxhY2Vob2xkZXJ9XG4gICAgICB7ZXJyb3JNZXNzYWdlfVxuICAgICAgY2xhc3M6Ym9yZGVyc1xuICAgICAgY2xhc3M6aW52YWxpZFxuICAgICAge21pbn1cbiAgICAgIHttYXh9XG4gICAgLz5cbiAgICB7I2lmIGludmFsaWR9XG4gICAgICA8ZGl2IGNsYXNzPVwiZXJyb3JcIj5cbiAgICAgICAge2Vycm9yTWVzc2FnZX1cbiAgICAgIDwvZGl2PlxuICAgIHsvaWZ9XG4gIDwvZGl2Plxuey9pZn1cblxuPHN0eWxlPlxuICAuaW5wdXQge1xuICAgIHBvc2l0aW9uOiByZWxhdGl2ZTtcbiAgICB0cmFuc2l0aW9uOiBmbGV4IDBzIDAuMnM7XG4gIH1cblxuICBpbnB1dCB7XG4gICAgZm9udC1zaXplOiB2YXIoLS1mb250LXNpemUteHNtYWxsKTtcbiAgICBmb250LXdlaWdodDogdmFyKC0tZm9udC13ZWlnaHQtbm9ybWFsKTtcbiAgICBsZXR0ZXItc3BhY2luZzogdmFyKC0tZm9udC1sZXR0ZXItc3BhY2luZy1uZWcteHNtYWxsKTtcbiAgICBsaW5lLWhlaWdodDogdmFyKC0tbGluZS1oZWlnaHQpO1xuICAgIHBvc2l0aW9uOiByZWxhdGl2ZTtcbiAgICBkaXNwbGF5OiBmbGV4O1xuICAgIG92ZXJmbG93OiB2aXNpYmxlO1xuICAgIGFsaWduLWl0ZW1zOiBjZW50ZXI7XG4gICAgd2lkdGg6IDEwMCU7XG4gICAgaGVpZ2h0OiAzMHB4O1xuICAgIG1hcmdpbjogMXB4IDAgMXB4IDA7XG4gICAgcGFkZGluZzogdmFyKC0tc2l6ZS14eHNtYWxsKSB2YXIoLS1zaXplLXh4eHNtYWxsKSB2YXIoLS1zaXplLXh4c21hbGwpXG4gICAgICB2YXIoLS1zaXplLXh4c21hbGwpO1xuICAgIGNvbG9yOiB2YXIoLS1maWdtYS1jb2xvci10ZXh0KTtcbiAgICBib3JkZXI6IDFweCBzb2xpZCB0cmFuc3BhcmVudDtcbiAgICBib3JkZXItcmFkaXVzOiB2YXIoLS1ib3JkZXItcmFkaXVzLXNtYWxsKTtcbiAgICBvdXRsaW5lOiBub25lO1xuICAgIGJhY2tncm91bmQtY29sb3I6IHZhcigtLWZpZ21hLWNvbG9yLWJnKTtcbiAgfVxuICBpbnB1dDpob3ZlcixcbiAgaW5wdXQ6cGxhY2Vob2xkZXItc2hvd246aG92ZXIge1xuICAgIGNvbG9yOiB2YXIoLS1maWdtYS1jb2xvci10ZXh0LWhvdmVyKTtcbiAgICBib3JkZXI6IDFweCBzb2xpZCB2YXIoLS1maWdtYS1jb2xvci1ib3JkZXIpO1xuICAgIGJhY2tncm91bmQtaW1hZ2U6IG5vbmU7XG4gIH1cbiAgaW5wdXQ6OnNlbGVjdGlvbiB7XG4gICAgY29sb3I6IHZhcigtLWZpZ21hLWNvbG9yLXRleHQpO1xuICAgIGJhY2tncm91bmQtY29sb3I6IHZhcigtLXRleHQtaGlnaGxpZ2h0KTtcbiAgfVxuICBpbnB1dDo6cGxhY2Vob2xkZXIge1xuICAgIGNvbG9yOiB2YXIoLS1maWdtYS1jb2xvci10ZXh0LXRlcnRpYXJ5KTtcbiAgICBib3JkZXI6IDFweCBzb2xpZCB0cmFuc3BhcmVudDtcbiAgfVxuICBpbnB1dDpwbGFjZWhvbGRlci1zaG93biB7XG4gICAgY29sb3I6IHZhcigtLWZpZ21hLWNvbG9yLXRleHQpO1xuICAgIGJvcmRlcjogMXB4IHNvbGlkIHZhcigtLWZpZ21hLWNvbG9yLWJvcmRlcik7XG4gICAgYmFja2dyb3VuZC1pbWFnZTogbm9uZTtcbiAgfVxuICBpbnB1dDpmb2N1czpwbGFjZWhvbGRlci1zaG93biB7XG4gICAgYm9yZGVyOiAxcHggc29saWQgdmFyKC0tZmlnbWEtY29sb3ItYm9yZGVyLXNlbGVjdGVkKTtcbiAgICBvdXRsaW5lOiAxcHggc29saWQgdmFyKC0tZmlnbWEtY29sb3ItYm9yZGVyLXNlbGVjdGVkKTtcbiAgICBvdXRsaW5lLW9mZnNldDogLTJweDtcbiAgfVxuICBpbnB1dDpkaXNhYmxlZDpob3ZlciB7XG4gICAgYm9yZGVyOiAxcHggc29saWQgdHJhbnNwYXJlbnQ7XG4gIH1cbiAgaW5wdXQ6YWN0aXZlLFxuICBpbnB1dDpmb2N1cyB7XG4gICAgY29sb3I6IHZhcigtLWZpZ21hLWNvbG9yLXRleHQpO1xuICAgIGJvcmRlcjogMXB4IHNvbGlkIHZhcigtLWZpZ21hLWNvbG9yLWJvcmRlci1zZWxlY3RlZCk7XG4gICAgb3V0bGluZTogMXB4IHNvbGlkIHZhcigtLWZpZ21hLWNvbG9yLWJvcmRlci1zZWxlY3RlZCk7XG4gICAgb3V0bGluZS1vZmZzZXQ6IC0ycHg7XG4gIH1cbiAgaW5wdXQ6ZGlzYWJsZWQge1xuICAgIHBvc2l0aW9uOiByZWxhdGl2ZTtcbiAgICBjb2xvcjogdmFyKC0tZmlnbWEtY29sb3ItdGV4dC1kaXNhYmxlZCk7XG4gICAgYmFja2dyb3VuZC1pbWFnZTogbm9uZTtcbiAgfVxuICBpbnB1dDpkaXNhYmxlZDphY3RpdmUge1xuICAgIG91dGxpbmU6IG5vbmU7XG4gIH1cblxuICAuYm9yZGVycyB7XG4gICAgYm9yZGVyOiAxcHggc29saWQgdmFyKC0tZmlnbWEtY29sb3ItYm9yZGVyKTtcbiAgICBiYWNrZ3JvdW5kLWltYWdlOiBub25lO1xuICB9XG4gIC5ib3JkZXJzOmRpc2FibGVkIHtcbiAgICBib3JkZXI6IDFweCBzb2xpZCB0cmFuc3BhcmVudDtcbiAgICBiYWNrZ3JvdW5kLWltYWdlOiBub25lO1xuICB9XG4gIC5ib3JkZXJzOmRpc2FibGVkOnBsYWNlaG9sZGVyLXNob3duIHtcbiAgICBib3JkZXI6IDFweCBzb2xpZCB0cmFuc3BhcmVudDtcbiAgICBiYWNrZ3JvdW5kLWltYWdlOiBub25lO1xuICB9XG4gIC5ib3JkZXJzOmRpc2FibGVkOnBsYWNlaG9sZGVyLXNob3duOmFjdGl2ZSB7XG4gICAgYm9yZGVyOiAxcHggc29saWQgdHJhbnNwYXJlbnQ7XG4gICAgb3V0bGluZTogbm9uZTtcbiAgfVxuICAuYm9yZGVyczpwbGFjZWhvbGRlci1zaG93biB7XG4gICAgYm9yZGVyOiAxcHggc29saWQgdmFyKC0tZmlnbWEtY29sb3ItYm9yZGVyKTtcbiAgICBiYWNrZ3JvdW5kLWltYWdlOiBub25lO1xuICB9XG5cbiAgLmluZGVudCB7XG4gICAgcGFkZGluZy1sZWZ0OiAzMnB4O1xuICB9XG5cbiAgLmludmFsaWQsXG4gIC5pbnZhbGlkOmhvdmVyLFxuICAuaW52YWxpZDpmb2N1cyB7XG4gICAgYm9yZGVyOiAxcHggc29saWQgdmFyKC0tZmlnbWEtY29sb3ItYm9yZGVyLWRhbmdlci1zdHJvbmcpO1xuICAgIG91dGxpbmU6IDFweCBzb2xpZCB2YXIoLS1maWdtYS1jb2xvci1ib3JkZXItZGFuZ2VyLXN0cm9uZyk7XG4gICAgb3V0bGluZS1vZmZzZXQ6IC0ycHg7XG4gIH1cblxuICAuaWNvbiB7XG4gICAgcG9zaXRpb246IGFic29sdXRlO1xuICAgIHRvcDogLTFweDtcbiAgICBsZWZ0OiAwO1xuICAgIHdpZHRoOiB2YXIoLS1zaXplLW1lZGl1bSk7XG4gICAgaGVpZ2h0OiB2YXIoLS1zaXplLW1lZGl1bSk7XG4gICAgei1pbmRleDogMTtcbiAgfVxuXG4gIC5lcnJvciB7XG4gICAgY29sb3I6IHZhcigtLWZpZ21hLWNvbG9yLXRleHQtZGFuZ2VyKTtcbiAgICBmb250LXNpemU6IHZhcigtLWZvbnQtc2l6ZS14c21hbGwpO1xuICAgIGZvbnQtd2VpZ2h0OiB2YXIoLS1mb250LXdlaWdodC1ub3JtYWwpO1xuICAgIGxldHRlci1zcGFjaW5nOiB2YXIoLS1mb250LWxldHRlci1zcGFjaW5nLW5lZy14c21hbGwpO1xuICAgIGxpbmUtaGVpZ2h0OiB2YXIoLS1saW5lLWhlaWdodCk7XG4gICAgcGFkZGluZy10b3A6IHZhcigtLXNpemUteHh4c21hbGwpO1xuICAgIHBhZGRpbmctbGVmdDogdmFyKC0tc2l6ZS14eHNtYWxsKTtcbiAgfVxuPC9zdHlsZT5cbiJdLCJuYW1lcyI6W10sIm1hcHBpbmdzIjoiQUFnRkUsTUFBTSxlQUFDLENBQUMsQUFDTixRQUFRLENBQUUsUUFBUSxDQUNsQixVQUFVLENBQUUsSUFBSSxDQUFDLEVBQUUsQ0FBQyxJQUFJLEFBQzFCLENBQUMsQUFFRCxLQUFLLGVBQUMsQ0FBQyxBQUNMLFNBQVMsQ0FBRSxJQUFJLGtCQUFrQixDQUFDLENBQ2xDLFdBQVcsQ0FBRSxJQUFJLG9CQUFvQixDQUFDLENBQ3RDLGNBQWMsQ0FBRSxJQUFJLGdDQUFnQyxDQUFDLENBQ3JELFdBQVcsQ0FBRSxJQUFJLGFBQWEsQ0FBQyxDQUMvQixRQUFRLENBQUUsUUFBUSxDQUNsQixPQUFPLENBQUUsSUFBSSxDQUNiLFFBQVEsQ0FBRSxPQUFPLENBQ2pCLFdBQVcsQ0FBRSxNQUFNLENBQ25CLEtBQUssQ0FBRSxJQUFJLENBQ1gsTUFBTSxDQUFFLElBQUksQ0FDWixNQUFNLENBQUUsR0FBRyxDQUFDLENBQUMsQ0FBQyxHQUFHLENBQUMs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 */");
+    }
+
+    // (52:0) {:else}
+    function create_else_block$1(ctx) {
+    	let div;
+    	let input;
+    	let t;
+    	let div_class_value;
+    	let mounted;
+    	let dispose;
+    	let if_block = /*invalid*/ ctx[8] && create_if_block_2(ctx);
+
+    	const block = {
+    		c: function create() {
+    			div = element("div");
+    			input = element("input");
+    			t = space();
+    			if (if_block) if_block.c();
+    			attr_dev(input, "type", "number");
+    			attr_dev(input, "id", /*id*/ ctx[1]);
+    			attr_dev(input, "name", /*name*/ ctx[2]);
+    			input.disabled = /*disabled*/ ctx[5];
+    			attr_dev(input, "placeholder", /*placeholder*/ ctx[10]);
+    			attr_dev(input, "errormessage", /*errorMessage*/ ctx[9]);
+    			attr_dev(input, "min", /*min*/ ctx[11]);
+    			attr_dev(input, "max", /*max*/ ctx[12]);
+    			attr_dev(input, "class", "svelte-13n8n0a");
+    			toggle_class(input, "borders", /*borders*/ ctx[4]);
+    			toggle_class(input, "invalid", /*invalid*/ ctx[8]);
+    			add_location(input, file$3, 53, 4, 1167);
+    			attr_dev(div, "class", div_class_value = "input " + /*className*/ ctx[13] + " svelte-13n8n0a");
+    			add_location(div, file$3, 52, 2, 1131);
+    		},
+    		m: function mount(target, anchor) {
+    			insert_dev(target, div, anchor);
+    			append_dev(div, input);
+    			set_input_value(input, /*value*/ ctx[0]);
+    			append_dev(div, t);
+    			if (if_block) if_block.m(div, null);
+
+    			if (!mounted) {
+    				dispose = [
+    					listen_dev(input, "input", /*input_handler_1*/ ctx[19], false, false, false),
+    					listen_dev(input, "change", /*change_handler_1*/ ctx[20], false, false, false),
+    					listen_dev(input, "keydown", /*keydown_handler_1*/ ctx[21], false, false, false),
+    					listen_dev(input, "focus", /*focus_handler_1*/ ctx[22], false, false, false),
+    					listen_dev(input, "blur", /*blur_handler_1*/ ctx[23], false, false, false),
+    					listen_dev(input, "input", /*input_input_handler_1*/ ctx[25])
+    				];
+
+    				mounted = true;
+    			}
+    		},
+    		p: function update(ctx, dirty) {
+    			if (dirty & /*id*/ 2) {
+    				attr_dev(input, "id", /*id*/ ctx[1]);
+    			}
+
+    			if (dirty & /*name*/ 4) {
+    				attr_dev(input, "name", /*name*/ ctx[2]);
+    			}
+
+    			if (dirty & /*disabled*/ 32) {
+    				prop_dev(input, "disabled", /*disabled*/ ctx[5]);
+    			}
+
+    			if (dirty & /*placeholder*/ 1024) {
+    				attr_dev(input, "placeholder", /*placeholder*/ ctx[10]);
+    			}
+
+    			if (dirty & /*errorMessage*/ 512) {
+    				attr_dev(input, "errormessage", /*errorMessage*/ ctx[9]);
+    			}
+
+    			if (dirty & /*min*/ 2048) {
+    				attr_dev(input, "min", /*min*/ ctx[11]);
+    			}
+
+    			if (dirty & /*max*/ 4096) {
+    				attr_dev(input, "max", /*max*/ ctx[12]);
+    			}
+
+    			if (dirty & /*value*/ 1 && to_number(input.value) !== /*value*/ ctx[0]) {
+    				set_input_value(input, /*value*/ ctx[0]);
+    			}
+
+    			if (dirty & /*borders*/ 16) {
+    				toggle_class(input, "borders", /*borders*/ ctx[4]);
+    			}
+
+    			if (dirty & /*invalid*/ 256) {
+    				toggle_class(input, "invalid", /*invalid*/ ctx[8]);
+    			}
+
+    			if (/*invalid*/ ctx[8]) {
+    				if (if_block) {
+    					if_block.p(ctx, dirty);
+    				} else {
+    					if_block = create_if_block_2(ctx);
+    					if_block.c();
+    					if_block.m(div, null);
+    				}
+    			} else if (if_block) {
+    				if_block.d(1);
+    				if_block = null;
+    			}
+
+    			if (dirty & /*className*/ 8192 && div_class_value !== (div_class_value = "input " + /*className*/ ctx[13] + " svelte-13n8n0a")) {
+    				attr_dev(div, "class", div_class_value);
+    			}
+    		},
+    		i: noop,
+    		o: noop,
+    		d: function destroy(detaching) {
+    			if (detaching) detach_dev(div);
+    			if (if_block) if_block.d();
+    			mounted = false;
+    			run_all(dispose);
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_else_block$1.name,
+    		type: "else",
+    		source: "(52:0) {:else}",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    // (22:0) {#if iconName || iconText}
+    function create_if_block$1(ctx) {
+    	let div1;
+    	let div0;
+    	let icon;
+    	let t0;
+    	let input;
+    	let t1;
+    	let div1_class_value;
+    	let current;
+    	let mounted;
+    	let dispose;
+
+    	icon = new Icon({
+    			props: {
+    				iconName: /*iconName*/ ctx[6],
+    				iconText: /*iconText*/ ctx[3],
+    				spin: /*spin*/ ctx[7],
+    				color: "--figma-color-icon"
+    			},
+    			$$inline: true
+    		});
+
+    	let if_block = /*invalid*/ ctx[8] && create_if_block_1(ctx);
+
+    	const block = {
+    		c: function create() {
+    			div1 = element("div");
+    			div0 = element("div");
+    			create_component(icon.$$.fragment);
+    			t0 = space();
+    			input = element("input");
+    			t1 = space();
+    			if (if_block) if_block.c();
+    			attr_dev(div0, "class", "icon svelte-13n8n0a");
+    			add_location(div0, file$3, 23, 4, 622);
+    			attr_dev(input, "type", "number");
+    			attr_dev(input, "id", /*id*/ ctx[1]);
+    			attr_dev(input, "name", /*name*/ ctx[2]);
+    			input.disabled = /*disabled*/ ctx[5];
+    			attr_dev(input, "placeholder", /*placeholder*/ ctx[10]);
+    			attr_dev(input, "errormessage", /*errorMessage*/ ctx[9]);
+    			attr_dev(input, "class", "indent svelte-13n8n0a");
+    			attr_dev(input, "min", /*min*/ ctx[11]);
+    			attr_dev(input, "max", /*max*/ ctx[12]);
+    			toggle_class(input, "borders", /*borders*/ ctx[4]);
+    			toggle_class(input, "invalid", /*invalid*/ ctx[8]);
+    			add_location(input, file$3, 26, 4, 727);
+    			attr_dev(div1, "class", div1_class_value = "input " + /*className*/ ctx[13] + " svelte-13n8n0a");
+    			add_location(div1, file$3, 22, 2, 586);
+    		},
+    		m: function mount(target, anchor) {
+    			insert_dev(target, div1, anchor);
+    			append_dev(div1, div0);
+    			mount_component(icon, div0, null);
+    			append_dev(div1, t0);
+    			append_dev(div1, input);
+    			set_input_value(input, /*value*/ ctx[0]);
+    			append_dev(div1, t1);
+    			if (if_block) if_block.m(div1, null);
+    			current = true;
+
+    			if (!mounted) {
+    				dispose = [
+    					listen_dev(input, "input", /*input_handler*/ ctx[14], false, false, false),
+    					listen_dev(input, "change", /*change_handler*/ ctx[15], false, false, false),
+    					listen_dev(input, "keydown", /*keydown_handler*/ ctx[16], false, false, false),
+    					listen_dev(input, "focus", /*focus_handler*/ ctx[17], false, false, false),
+    					listen_dev(input, "blur", /*blur_handler*/ ctx[18], false, false, false),
+    					listen_dev(input, "input", /*input_input_handler*/ ctx[24])
+    				];
+
+    				mounted = true;
+    			}
+    		},
+    		p: function update(ctx, dirty) {
+    			const icon_changes = {};
+    			if (dirty & /*iconName*/ 64) icon_changes.iconName = /*iconName*/ ctx[6];
+    			if (dirty & /*iconText*/ 8) icon_changes.iconText = /*iconText*/ ctx[3];
+    			if (dirty & /*spin*/ 128) icon_changes.spin = /*spin*/ ctx[7];
+    			icon.$set(icon_changes);
+
+    			if (!current || dirty & /*id*/ 2) {
+    				attr_dev(input, "id", /*id*/ ctx[1]);
+    			}
+
+    			if (!current || dirty & /*name*/ 4) {
+    				attr_dev(input, "name", /*name*/ ctx[2]);
+    			}
+
+    			if (!current || dirty & /*disabled*/ 32) {
+    				prop_dev(input, "disabled", /*disabled*/ ctx[5]);
+    			}
+
+    			if (!current || dirty & /*placeholder*/ 1024) {
+    				attr_dev(input, "placeholder", /*placeholder*/ ctx[10]);
+    			}
+
+    			if (!current || dirty & /*errorMessage*/ 512) {
+    				attr_dev(input, "errormessage", /*errorMessage*/ ctx[9]);
+    			}
+
+    			if (!current || dirty & /*min*/ 2048) {
+    				attr_dev(input, "min", /*min*/ ctx[11]);
+    			}
+
+    			if (!current || dirty & /*max*/ 4096) {
+    				attr_dev(input, "max", /*max*/ ctx[12]);
+    			}
+
+    			if (dirty & /*value*/ 1 && to_number(input.value) !== /*value*/ ctx[0]) {
+    				set_input_value(input, /*value*/ ctx[0]);
+    			}
+
+    			if (!current || dirty & /*borders*/ 16) {
+    				toggle_class(input, "borders", /*borders*/ ctx[4]);
+    			}
+
+    			if (!current || dirty & /*invalid*/ 256) {
+    				toggle_class(input, "invalid", /*invalid*/ ctx[8]);
+    			}
+
+    			if (/*invalid*/ ctx[8]) {
+    				if (if_block) {
+    					if_block.p(ctx, dirty);
+    				} else {
+    					if_block = create_if_block_1(ctx);
+    					if_block.c();
+    					if_block.m(div1, null);
+    				}
+    			} else if (if_block) {
+    				if_block.d(1);
+    				if_block = null;
+    			}
+
+    			if (!current || dirty & /*className*/ 8192 && div1_class_value !== (div1_class_value = "input " + /*className*/ ctx[13] + " svelte-13n8n0a")) {
+    				attr_dev(div1, "class", div1_class_value);
+    			}
+    		},
+    		i: function intro(local) {
+    			if (current) return;
+    			transition_in(icon.$$.fragment, local);
+    			current = true;
+    		},
+    		o: function outro(local) {
+    			transition_out(icon.$$.fragment, local);
+    			current = false;
+    		},
+    		d: function destroy(detaching) {
+    			if (detaching) detach_dev(div1);
+    			destroy_component(icon);
+    			if (if_block) if_block.d();
+    			mounted = false;
+    			run_all(dispose);
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_if_block$1.name,
+    		type: "if",
+    		source: "(22:0) {#if iconName || iconText}",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    // (72:4) {#if invalid}
+    function create_if_block_2(ctx) {
+    	let div;
+    	let t;
+
+    	const block = {
+    		c: function create() {
+    			div = element("div");
+    			t = text(/*errorMessage*/ ctx[9]);
+    			attr_dev(div, "class", "error svelte-13n8n0a");
+    			add_location(div, file$3, 72, 6, 1465);
+    		},
+    		m: function mount(target, anchor) {
+    			insert_dev(target, div, anchor);
+    			append_dev(div, t);
+    		},
+    		p: function update(ctx, dirty) {
+    			if (dirty & /*errorMessage*/ 512) set_data_dev(t, /*errorMessage*/ ctx[9]);
+    		},
+    		d: function destroy(detaching) {
+    			if (detaching) detach_dev(div);
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_if_block_2.name,
+    		type: "if",
+    		source: "(72:4) {#if invalid}",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    // (46:4) {#if invalid}
+    function create_if_block_1(ctx) {
+    	let div;
+    	let t;
+
+    	const block = {
+    		c: function create() {
+    			div = element("div");
+    			t = text(/*errorMessage*/ ctx[9]);
+    			attr_dev(div, "class", "error svelte-13n8n0a");
+    			add_location(div, file$3, 46, 6, 1046);
+    		},
+    		m: function mount(target, anchor) {
+    			insert_dev(target, div, anchor);
+    			append_dev(div, t);
+    		},
+    		p: function update(ctx, dirty) {
+    			if (dirty & /*errorMessage*/ 512) set_data_dev(t, /*errorMessage*/ ctx[9]);
+    		},
+    		d: function destroy(detaching) {
+    			if (detaching) detach_dev(div);
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_if_block_1.name,
+    		type: "if",
+    		source: "(46:4) {#if invalid}",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    function create_fragment$3(ctx) {
+    	let current_block_type_index;
+    	let if_block;
+    	let if_block_anchor;
+    	let current;
+    	const if_block_creators = [create_if_block$1, create_else_block$1];
+    	const if_blocks = [];
+
+    	function select_block_type(ctx, dirty) {
+    		if (/*iconName*/ ctx[6] || /*iconText*/ ctx[3]) return 0;
+    		return 1;
+    	}
+
+    	current_block_type_index = select_block_type(ctx);
+    	if_block = if_blocks[current_block_type_index] = if_block_creators[current_block_type_index](ctx);
+
+    	const block = {
+    		c: function create() {
+    			if_block.c();
+    			if_block_anchor = empty();
+    		},
+    		l: function claim(nodes) {
+    			throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
+    		},
+    		m: function mount(target, anchor) {
+    			if_blocks[current_block_type_index].m(target, anchor);
+    			insert_dev(target, if_block_anchor, anchor);
+    			current = true;
+    		},
+    		p: function update(ctx, [dirty]) {
+    			let previous_block_index = current_block_type_index;
+    			current_block_type_index = select_block_type(ctx);
+
+    			if (current_block_type_index === previous_block_index) {
+    				if_blocks[current_block_type_index].p(ctx, dirty);
+    			} else {
+    				group_outros();
+
+    				transition_out(if_blocks[previous_block_index], 1, 1, () => {
+    					if_blocks[previous_block_index] = null;
+    				});
+
+    				check_outros();
+    				if_block = if_blocks[current_block_type_index];
+
+    				if (!if_block) {
+    					if_block = if_blocks[current_block_type_index] = if_block_creators[current_block_type_index](ctx);
+    					if_block.c();
+    				} else {
+    					if_block.p(ctx, dirty);
+    				}
+
+    				transition_in(if_block, 1);
+    				if_block.m(if_block_anchor.parentNode, if_block_anchor);
+    			}
+    		},
+    		i: function intro(local) {
+    			if (current) return;
+    			transition_in(if_block);
+    			current = true;
+    		},
+    		o: function outro(local) {
+    			transition_out(if_block);
+    			current = false;
+    		},
+    		d: function destroy(detaching) {
+    			if_blocks[current_block_type_index].d(detaching);
+    			if (detaching) detach_dev(if_block_anchor);
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_fragment$3.name,
+    		type: "component",
+    		source: "",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    function instance$3($$self, $$props, $$invalidate) {
+    	let { $$slots: slots = {}, $$scope } = $$props;
+    	validate_slots('Input_numbers', slots, []);
+    	let { id = null } = $$props;
+    	let { value = null } = $$props;
+    	let { name = null } = $$props;
+    	let { iconText = null } = $$props;
+    	let { borders = false } = $$props;
+    	let { disabled = false } = $$props;
+    	let { iconName = null } = $$props;
+    	let { spin = false } = $$props;
+    	let { invalid = false } = $$props;
+    	let { errorMessage = "Error message" } = $$props;
+    	let { placeholder = "Input something here..." } = $$props;
+    	let { min = 24 } = $$props;
+    	let { max = 1024 } = $$props;
+    	let { class: className = "" } = $$props;
+
+    	const writable_props = [
+    		'id',
+    		'value',
+    		'name',
+    		'iconText',
+    		'borders',
+    		'disabled',
+    		'iconName',
+    		'spin',
+    		'invalid',
+    		'errorMessage',
+    		'placeholder',
+    		'min',
+    		'max',
+    		'class'
+    	];
+
+    	Object.keys($$props).forEach(key => {
+    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== '$$' && key !== 'slot') console.warn(`<Input_numbers> was created with unknown prop '${key}'`);
+    	});
+
+    	function input_handler(event) {
+    		bubble.call(this, $$self, event);
+    	}
+
+    	function change_handler(event) {
+    		bubble.call(this, $$self, event);
+    	}
+
+    	function keydown_handler(event) {
+    		bubble.call(this, $$self, event);
+    	}
+
+    	function focus_handler(event) {
+    		bubble.call(this, $$self, event);
+    	}
+
+    	function blur_handler(event) {
+    		bubble.call(this, $$self, event);
+    	}
+
+    	function input_handler_1(event) {
+    		bubble.call(this, $$self, event);
+    	}
+
+    	function change_handler_1(event) {
+    		bubble.call(this, $$self, event);
+    	}
+
+    	function keydown_handler_1(event) {
+    		bubble.call(this, $$self, event);
+    	}
+
+    	function focus_handler_1(event) {
+    		bubble.call(this, $$self, event);
+    	}
+
+    	function blur_handler_1(event) {
+    		bubble.call(this, $$self, event);
+    	}
+
+    	function input_input_handler() {
+    		value = to_number(this.value);
+    		$$invalidate(0, value);
+    	}
+
+    	function input_input_handler_1() {
+    		value = to_number(this.value);
+    		$$invalidate(0, value);
+    	}
+
+    	$$self.$$set = $$props => {
+    		if ('id' in $$props) $$invalidate(1, id = $$props.id);
+    		if ('value' in $$props) $$invalidate(0, value = $$props.value);
+    		if ('name' in $$props) $$invalidate(2, name = $$props.name);
+    		if ('iconText' in $$props) $$invalidate(3, iconText = $$props.iconText);
+    		if ('borders' in $$props) $$invalidate(4, borders = $$props.borders);
+    		if ('disabled' in $$props) $$invalidate(5, disabled = $$props.disabled);
+    		if ('iconName' in $$props) $$invalidate(6, iconName = $$props.iconName);
+    		if ('spin' in $$props) $$invalidate(7, spin = $$props.spin);
+    		if ('invalid' in $$props) $$invalidate(8, invalid = $$props.invalid);
+    		if ('errorMessage' in $$props) $$invalidate(9, errorMessage = $$props.errorMessage);
+    		if ('placeholder' in $$props) $$invalidate(10, placeholder = $$props.placeholder);
+    		if ('min' in $$props) $$invalidate(11, min = $$props.min);
+    		if ('max' in $$props) $$invalidate(12, max = $$props.max);
+    		if ('class' in $$props) $$invalidate(13, className = $$props.class);
+    	};
+
+    	$$self.$capture_state = () => ({
+    		Icon,
+    		id,
+    		value,
+    		name,
+    		iconText,
+    		borders,
+    		disabled,
+    		iconName,
+    		spin,
+    		invalid,
+    		errorMessage,
+    		placeholder,
+    		min,
+    		max,
+    		className
+    	});
+
+    	$$self.$inject_state = $$props => {
+    		if ('id' in $$props) $$invalidate(1, id = $$props.id);
+    		if ('value' in $$props) $$invalidate(0, value = $$props.value);
+    		if ('name' in $$props) $$invalidate(2, name = $$props.name);
+    		if ('iconText' in $$props) $$invalidate(3, iconText = $$props.iconText);
+    		if ('borders' in $$props) $$invalidate(4, borders = $$props.borders);
+    		if ('disabled' in $$props) $$invalidate(5, disabled = $$props.disabled);
+    		if ('iconName' in $$props) $$invalidate(6, iconName = $$props.iconName);
+    		if ('spin' in $$props) $$invalidate(7, spin = $$props.spin);
+    		if ('invalid' in $$props) $$invalidate(8, invalid = $$props.invalid);
+    		if ('errorMessage' in $$props) $$invalidate(9, errorMessage = $$props.errorMessage);
+    		if ('placeholder' in $$props) $$invalidate(10, placeholder = $$props.placeholder);
+    		if ('min' in $$props) $$invalidate(11, min = $$props.min);
+    		if ('max' in $$props) $$invalidate(12, max = $$props.max);
+    		if ('className' in $$props) $$invalidate(13, className = $$props.className);
+    	};
+
+    	if ($$props && "$$inject" in $$props) {
+    		$$self.$inject_state($$props.$$inject);
+    	}
+
+    	return [
+    		value,
+    		id,
+    		name,
+    		iconText,
+    		borders,
+    		disabled,
+    		iconName,
+    		spin,
+    		invalid,
+    		errorMessage,
+    		placeholder,
+    		min,
+    		max,
+    		className,
+    		input_handler,
+    		change_handler,
+    		keydown_handler,
+    		focus_handler,
+    		blur_handler,
+    		input_handler_1,
+    		change_handler_1,
+    		keydown_handler_1,
+    		focus_handler_1,
+    		blur_handler_1,
+    		input_input_handler,
+    		input_input_handler_1
+    	];
+    }
+
+    class Input_numbers extends SvelteComponentDev {
+    	constructor(options) {
+    		super(options);
+
+    		init(
+    			this,
+    			options,
+    			instance$3,
+    			create_fragment$3,
+    			safe_not_equal,
+    			{
+    				id: 1,
+    				value: 0,
+    				name: 2,
+    				iconText: 3,
+    				borders: 4,
+    				disabled: 5,
+    				iconName: 6,
+    				spin: 7,
+    				invalid: 8,
+    				errorMessage: 9,
+    				placeholder: 10,
+    				min: 11,
+    				max: 12,
+    				class: 13
+    			},
+    			add_css$3
+    		);
+
+    		dispatch_dev("SvelteRegisterComponent", {
+    			component: this,
+    			tagName: "Input_numbers",
+    			options,
+    			id: create_fragment$3.name
+    		});
+    	}
+
+    	get id() {
+    		throw new Error("<Input_numbers>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	set id(value) {
+    		throw new Error("<Input_numbers>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	get value() {
+    		throw new Error("<Input_numbers>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	set value(value) {
+    		throw new Error("<Input_numbers>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	get name() {
+    		throw new Error("<Input_numbers>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	set name(value) {
+    		throw new Error("<Input_numbers>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	get iconText() {
+    		throw new Error("<Input_numbers>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	set iconText(value) {
+    		throw new Error("<Input_numbers>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	get borders() {
+    		throw new Error("<Input_numbers>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	set borders(value) {
+    		throw new Error("<Input_numbers>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	get disabled() {
+    		throw new Error("<Input_numbers>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	set disabled(value) {
+    		throw new Error("<Input_numbers>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	get iconName() {
+    		throw new Error("<Input_numbers>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	set iconName(value) {
+    		throw new Error("<Input_numbers>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	get spin() {
+    		throw new Error("<Input_numbers>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	set spin(value) {
+    		throw new Error("<Input_numbers>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	get invalid() {
+    		throw new Error("<Input_numbers>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	set invalid(value) {
+    		throw new Error("<Input_numbers>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	get errorMessage() {
+    		throw new Error("<Input_numbers>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	set errorMessage(value) {
+    		throw new Error("<Input_numbers>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	get placeholder() {
+    		throw new Error("<Input_numbers>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	set placeholder(value) {
+    		throw new Error("<Input_numbers>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	get min() {
+    		throw new Error("<Input_numbers>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	set min(value) {
+    		throw new Error("<Input_numbers>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	get max() {
+    		throw new Error("<Input_numbers>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	set max(value) {
+    		throw new Error("<Input_numbers>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	get class() {
+    		throw new Error("<Input_numbers>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	set class(value) {
+    		throw new Error("<Input_numbers>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+    }
+
+    const colors = readable([
+      {
+        name: "violet",
+        fills: { r: 0.93, g: 0.89, b: 1.0 },
+        stroke: { r: 0.59, g: 0.28, b: 1.0 },
+      },
+      {
+        name: "blue",
+        fills: { r: 0.86, g: 0.94, b: 1.0 },
+        stroke: { r: 0.05, g: 0.6, b: 1.0 },
+      },
+      {
+        name: "green",
+        fills: { r: 0.86, g: 0.95, b: 0.9 },
+        stroke: { r: 0.08, g: 0.68, b: 0.36 },
+      },
+      {
+        name: "yellow",
+        fills: { r: 1.0, g: 0.96, b: 0.87 },
+        stroke: { r: 1.0, g: 0.8, b: 0.16 },
+      },
+      {
+        name: "orange",
+        fills: { r: 1.0, g: 0.95, b: 0.87 },
+        stroke: { r: 1.0, g: 0.65, b: 0.16 },
+      },
+      {
+        name: "red",
+        fills: { r: 0.99, g: 0.89, b: 0.87 },
+        stroke: { r: 0.95, g: 0.28, b: 0.13 },
+      },
+      {
+        name: "gray",
+        fills: { r: 0.86, g: 0.86, b: 0.86 },
+        stroke: { r: 0.17, g: 0.17, b: 0.17 },
+      },
+      {
+        name: "light-violet",
+        fills: { r: 0.98, g: 0.96, b: 1.0 },
+        stroke: { r: 0.89, g: 0.8, b: 1.0 },
+      },
+      {
+        name: "light-blue",
+        fills: { r: 0.96, g: 0.98, b: 1.0 },
+        stroke: { r: 0.74, g: 0.89, b: 1.0 },
+      },
+      {
+        name: "light-green",
+        fills: { r: 0.95, g: 0.99, b: 0.96 },
+        stroke: { r: 0.68, g: 0.95, b: 0.77 },
+      },
+      {
+        name: "light-yellow",
+        fills: { r: 1.0, g: 0.98, b: 0.94 },
+        stroke: { r: 1.0, g: 0.91, b: 0.64 },
+      },
+      {
+        name: "light-orange",
+        fills: { r: 1.0, g: 0.97, b: 0.94 },
+        stroke: { r: 0.98, g: 0.82, b: 0.61 },
+      },
+      {
+        name: "light-red",
+        fills: { r: 1.0, g: 0.96, b: 0.96 },
+        stroke: { r: 1.0, g: 0.78, b: 0.76 },
+      },
+      {
+        name: "white",
+        fills: { r: 1.0, g: 1.0, b: 1.0 },
+        stroke: { r: 0.9, g: 0.9, b: 0.9 },
+      },
+    ]);
+
+    function normalizeColor(color) {
+      return `rgb(${color.r * 256}, ${color.g * 256}, ${color.b * 256})`;
+    }
+
+    /* src/PluginUI.svelte generated by Svelte v3.55.1 */
+    const file$4 = "src/PluginUI.svelte";
+
+    function add_css$4(target) {
+    	append_styles(target, "svelte-61e06o", ".container.svelte-61e06o{margin:auto var(--size-xxsmall) var(--size-xxsmall) var(--size-xxsmall)}.color-grid.svelte-61e06o{display:grid;grid-template-columns:repeat(7, var(--size-medium));gap:var(--size-xxxsmall);width:100%;margin-bottom:var(--size-xxsmall)}.color-selector.svelte-61e06o{cursor:pointer;width:var(--size-medium);height:var(--size-medium);border-radius:100%;border-width:1px;border-style:solid}.color-selector.selected.svelte-61e06o{border-width:2px}\n/*# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiUGx1Z2luVUkuc3ZlbHRlIiwic291cmNlcyI6WyJQbHVnaW5VSS5zdmVsdGUiXSwic291cmNlc0NvbnRlbnQiOlsiPHNjcmlwdD5cbiAgaW1wb3J0IHsgb25Nb3VudCB9IGZyb20gXCJzdmVsdGVcIjtcbiAgaW1wb3J0IHsgR2xvYmFsQ1NTIH0gZnJvbSBcImZpZ21hLXBsdWdpbi1kcy1zdmVsdGVcIjtcbiAgaW1wb3J0IHsgTGFiZWwsIEljb24sIEljb25Ib3Jpem9udGFsUGFkZGluZyB9IGZyb20gXCJmaWdtYS1wbHVnaW4tZHMtc3ZlbHRlXCI7XG4gIGltcG9ydCB7IEJ1dHRvbiwgSW5wdXROdW1iZXJzIH0gZnJvbSBcIi4vY29tcG9uZW50cy9jb21wb25lbnRzXCI7XG5cbiAgaW1wb3J0IHsgY29sb3JzIH0gZnJvbSBcIi4vc3RvcmVzXCI7XG4gIGltcG9ydCB7IG5vcm1hbGl6ZUNvbG9yIH0gZnJvbSBcIi4vdWktaGVscGVycy9mdW5jdGlvbnNcIjtcblxuICBsZXQgcGFkZGluZyA9IDMyO1xuICBsZXQgc3R5bGUgPSAkY29sb3JzWzBdO1xuXG4gIGZ1bmN0aW9uIHdyYXBJbihwYWRkaW5nLCBzdHlsZSkge1xuICAgIHBhcmVudC5wb3N0TWVzc2FnZShcbiAgICAgIHsgcGx1Z2luTWVzc2FnZTogeyB0eXBlOiBcIndyYXBJblwiLCBwYWRkaW5nLCBzdHlsZSB9IH0sXG4gICAgICBcIipcIlxuICAgICk7XG4gIH1cblxuICB3aW5kb3cub25tZXNzYWdlID0gYXN5bmMgKGV2ZW50KSA9PiB7XG4gICAgY29uc3QgbWVzc2FnZSA9IGF3YWl0IGV2ZW50LmRhdGEucGx1Z2luTWVzc2FnZTtcbiAgICBpZiAobWVzc2FnZS5wbHVnaW5NZXNzYWdlLnR5cGUgPT09IFwic2F2ZWQtcGFyYW1zXCIpIHtcbiAgICAgIHBhZGRpbmcgPSBtZXNzYWdlLnBsdWdpbk1lc3NhZ2UucGFyYW1zLnBhZGRpbmc7XG4gICAgICBzdHlsZSA9IG1lc3NhZ2UucGx1Z2luTWVzc2FnZS5wYXJhbXMuc3R5bGU7XG4gICAgfVxuICB9O1xuPC9zY3JpcHQ+XG5cbjxMYWJlbD5QYWRkaW5nczwvTGFiZWw+XG48ZGl2IGNsYXNzPVwiY29udGFpbmVyXCI+XG4gIDxJbnB1dE51bWJlcnMgYmluZDp2YWx1ZT17cGFkZGluZ30gYm9yZGVycyBpY29uTmFtZT17SWNvbkhvcml6b250YWxQYWRkaW5nfSAvPlxuPC9kaXY+XG48TGFiZWw+Q29sb3I8L0xhYmVsPlxuPGRpdiBjbGFzcz1cImNvbG9yLWdyaWQgY29udGFpbmVyXCI+XG4gIHsjZWFjaCAkY29sb3JzIGFzIGNvbG9yfVxuICAgIDwhLS0gc3ZlbHRlLWlnbm9yZSBhMTF5LWNsaWNrLWV2ZW50cy1oYXZlLWtleS1ldmVudHMgLS0+XG4gICAgPGRpdlxuICAgICAgY2xhc3M9XCJjb2xvci1zZWxlY3RvclwiXG4gICAgICBjbGFzczpzZWxlY3RlZD17c3R5bGUubmFtZSA9PT0gY29sb3IubmFtZX1cbiAgICAgIHN0eWxlPVwiYmFja2dyb3VuZDp7bm9ybWFsaXplQ29sb3IoXG4gICAgICAgIGNvbG9yLmZpbGxzXG4gICAgICApfTsgYm9yZGVyLWNvbG9yOntub3JtYWxpemVDb2xvcihjb2xvci5zdHJva2UpfTtcIlxuICAgICAgb246Y2xpY2s9eygpID0+IHtcbiAgICAgICAgc3R5bGUgPSBjb2xvcjtcbiAgICAgIH19XG4gICAgLz5cbiAgey9lYWNofVxuPC9kaXY+XG48ZGl2IGNsYXNzPVwiY29udGFpbmVyXCI+XG4gIDxCdXR0b24gb246Y2xpY2s9eygpID0+IHdyYXBJbihwYWRkaW5nLCBzdHlsZSl9IHZhcmlhbnQ9XCJwcmltYXJ5IGZ1bGwtd2lkdGhcIlxuICAgID5XcmFwIGluIHNlY3Rpb24hPC9CdXR0b25cbiAgPlxuPC9kaXY+XG5cbjxzdHlsZT5cbiAgLmNvbnRhaW5lciB7XG4gICAgbWFyZ2luOiBhdXRvIHZhcigtLXNpemUteHhzbWFsbCkgdmFyKC0tc2l6ZS14eHNtYWxsKSB2YXIoLS1zaXplLXh4c21hbGwpO1xuICB9XG4gIC5jb2xvci1ncmlkIHtcbiAgICBkaXNwbGF5OiBncmlkO1xuICAgIGdyaWQtdGVtcGxhdGUtY29sdW1uczogcmVwZWF0KDcsIHZhcigtLXNpemUtbWVkaXVtKSk7XG4gICAgZ2FwOiB2YXIoLS1zaXplLXh4eHNtYWxsKTtcbiAgICB3aWR0aDogMTAwJTtcbiAgICBtYXJnaW4tYm90dG9tOiB2YXIoLS1zaXplLXh4c21hbGwpO1xuICB9XG4gIC5jb2xvci1zZWxlY3RvciB7XG4gICAgY3Vyc29yOiBwb2ludGVyO1xuICAgIHdpZHRoOiB2YXIoLS1zaXplLW1lZGl1bSk7XG4gICAgaGVpZ2h0OiB2YXIoLS1zaXplLW1lZGl1bSk7XG4gICAgYm9yZGVyLXJhZGl1czogMTAwJTtcbiAgICBib3JkZXItd2lkdGg6IDFweDtcbiAgICBib3JkZXItc3R5bGU6IHNvbGlkO1xuICB9XG4gIC5jb2xvci1zZWxlY3Rvci5zZWxlY3RlZCB7XG4gICAgYm9yZGVyLXdpZHRoOiAycHg7XG4gIH1cbjwvc3R5bGU+XG4iXSwibmFtZXMiOltdLCJtYXBwaW5ncyI6IkFBdURFLFVBQVUsY0FBQyxDQUFDLEFBQ1YsTUFBTSxDQUFFLElBQUksQ0FBQyxJQUFJLGNBQWMsQ0FBQyxDQUFDLElBQUksY0FBYyxDQUFDLENBQUMsSUFBSSxjQUFjLENBQUMsQUFDMUUsQ0FBQyxBQUNELFdBQVcsY0FBQyxDQUFDLEFBQ1gsT0FBTyxDQUFFLElBQUksQ0FDYixxQkFBcUIsQ0FBRSxPQUFPLENBQUMsQ0FBQyxDQUFDLElBQUksYUFBYSxDQUFDLENBQUMsQ0FDcEQsR0FBRyxDQUFFLElBQUksZUFBZSxDQUFDLENBQ3pCLEtBQUssQ0FBRSxJQUFJLENBQ1gsYUFBYSxDQUFFLElBQUksY0FBYyxDQUFDLEFBQ3BDLENBQUMsQUFDRCxlQUFlLGNBQUMsQ0FBQyxBQUNmLE1BQU0sQ0FBRSxPQUFPLENBQ2YsS0FBSyxDQUFFLElBQUksYUFBYSxDQUFDLENBQ3pCLE1BQU0sQ0FBRSxJQUFJLGFBQWEsQ0FBQyxDQUMxQixhQUFhLENBQUUsSUFBSSxDQUNuQixZQUFZLENBQUUsR0FBRyxDQUNqQixZQUFZLENBQUUsS0FBSyxBQUNyQixDQUFDLEFBQ0QsZUFBZSxTQUFTLGNBQUMsQ0FBQyxBQUN4QixZQUFZLENBQUUsR0FBRyxBQUNuQixDQUFDIn0= */");
+    }
+
+    function get_each_context(ctx, list, i) {
+    	const child_ctx = ctx.slice();
+    	child_ctx[6] = list[i];
+    	return child_ctx;
+    }
+
+    // (29:0) <Label>
+    function create_default_slot_2(ctx) {
+    	let t;
+
+    	const block = {
+    		c: function create() {
+    			t = text("Paddings");
+    		},
+    		m: function mount(target, anchor) {
+    			insert_dev(target, t, anchor);
+    		},
+    		d: function destroy(detaching) {
+    			if (detaching) detach_dev(t);
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_default_slot_2.name,
+    		type: "slot",
+    		source: "(29:0) <Label>",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    // (33:0) <Label>
+    function create_default_slot_1(ctx) {
+    	let t;
+
+    	const block = {
+    		c: function create() {
+    			t = text("Color");
+    		},
+    		m: function mount(target, anchor) {
+    			insert_dev(target, t, anchor);
+    		},
+    		d: function destroy(detaching) {
+    			if (detaching) detach_dev(t);
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_default_slot_1.name,
+    		type: "slot",
+    		source: "(33:0) <Label>",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    // (35:2) {#each $colors as color}
+    function create_each_block(ctx) {
+    	let div;
+    	let mounted;
+    	let dispose;
+
+    	function click_handler() {
+    		return /*click_handler*/ ctx[4](/*color*/ ctx[6]);
+    	}
+
+    	const block = {
+    		c: function create() {
+    			div = element("div");
+    			attr_dev(div, "class", "color-selector svelte-61e06o");
+    			set_style(div, "background", normalizeColor(/*color*/ ctx[6].fills));
+    			set_style(div, "border-color", normalizeColor(/*color*/ ctx[6].stroke));
+    			toggle_class(div, "selected", /*style*/ ctx[1].name === /*color*/ ctx[6].name);
+    			add_location(div, file$4, 36, 4, 1091);
+    		},
+    		m: function mount(target, anchor) {
+    			insert_dev(target, div, anchor);
+
+    			if (!mounted) {
+    				dispose = listen_dev(div, "click", click_handler, false, false, false);
+    				mounted = true;
+    			}
+    		},
+    		p: function update(new_ctx, dirty) {
+    			ctx = new_ctx;
+
+    			if (dirty & /*$colors*/ 4) {
+    				set_style(div, "background", normalizeColor(/*color*/ ctx[6].fills));
+    			}
+
+    			if (dirty & /*$colors*/ 4) {
+    				set_style(div, "border-color", normalizeColor(/*color*/ ctx[6].stroke));
+    			}
+
+    			if (dirty & /*style, $colors*/ 6) {
+    				toggle_class(div, "selected", /*style*/ ctx[1].name === /*color*/ ctx[6].name);
+    			}
+    		},
+    		d: function destroy(detaching) {
+    			if (detaching) detach_dev(div);
+    			mounted = false;
+    			dispose();
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_each_block.name,
+    		type: "each",
+    		source: "(35:2) {#each $colors as color}",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    // (50:2) <Button on:click={() => wrapIn(padding, style)} variant="primary full-width"     >
+    function create_default_slot(ctx) {
+    	let t;
+
+    	const block = {
+    		c: function create() {
+    			t = text("Wrap in section!");
+    		},
+    		m: function mount(target, anchor) {
+    			insert_dev(target, t, anchor);
+    		},
+    		d: function destroy(detaching) {
+    			if (detaching) detach_dev(t);
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_default_slot.name,
+    		type: "slot",
+    		source: "(50:2) <Button on:click={() => wrapIn(padding, style)} variant=\\\"primary full-width\\\"     >",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    function create_fragment$4(ctx) {
+    	let label0;
+    	let t0;
+    	let div0;
+    	let inputnumbers;
+    	let updating_value;
+    	let t1;
+    	let label1;
+    	let t2;
+    	let div1;
+    	let t3;
+    	let div2;
+    	let button;
+    	let current;
+
+    	label0 = new Label({
+    			props: {
+    				$$slots: { default: [create_default_slot_2] },
+    				$$scope: { ctx }
+    			},
+    			$$inline: true
+    		});
+
+    	function inputnumbers_value_binding(value) {
+    		/*inputnumbers_value_binding*/ ctx[3](value);
+    	}
+
+    	let inputnumbers_props = {
+    		borders: true,
+    		iconName: IconHorizontalPadding
+    	};
+
+    	if (/*padding*/ ctx[0] !== void 0) {
+    		inputnumbers_props.value = /*padding*/ ctx[0];
+    	}
+
+    	inputnumbers = new Input_numbers({
+    			props: inputnumbers_props,
+    			$$inline: true
+    		});
+
+    	binding_callbacks.push(() => bind(inputnumbers, 'value', inputnumbers_value_binding));
+
+    	label1 = new Label({
+    			props: {
+    				$$slots: { default: [create_default_slot_1] },
+    				$$scope: { ctx }
+    			},
+    			$$inline: true
+    		});
+
+    	let each_value = /*$colors*/ ctx[2];
+    	validate_each_argument(each_value);
+    	let each_blocks = [];
+
+    	for (let i = 0; i < each_value.length; i += 1) {
+    		each_blocks[i] = create_each_block(get_each_context(ctx, each_value, i));
+    	}
+
+    	button = new Button({
+    			props: {
+    				variant: "primary full-width",
+    				$$slots: { default: [create_default_slot] },
+    				$$scope: { ctx }
+    			},
+    			$$inline: true
+    		});
+
+    	button.$on("click", /*click_handler_1*/ ctx[5]);
+
+    	const block = {
+    		c: function create() {
+    			create_component(label0.$$.fragment);
+    			t0 = space();
+    			div0 = element("div");
+    			create_component(inputnumbers.$$.fragment);
+    			t1 = space();
+    			create_component(label1.$$.fragment);
+    			t2 = space();
+    			div1 = element("div");
+
+    			for (let i = 0; i < each_blocks.length; i += 1) {
+    				each_blocks[i].c();
+    			}
+
+    			t3 = space();
+    			div2 = element("div");
+    			create_component(button.$$.fragment);
+    			attr_dev(div0, "class", "container svelte-61e06o");
+    			add_location(div0, file$4, 29, 0, 831);
+    			attr_dev(div1, "class", "color-grid container svelte-61e06o");
+    			add_location(div1, file$4, 33, 0, 964);
+    			attr_dev(div2, "class", "container svelte-61e06o");
+    			add_location(div2, file$4, 48, 0, 1371);
+    		},
+    		l: function claim(nodes) {
+    			throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
+    		},
+    		m: function mount(target, anchor) {
+    			mount_component(label0, target, anchor);
+    			insert_dev(target, t0, anchor);
+    			insert_dev(target, div0, anchor);
+    			mount_component(inputnumbers, div0, null);
+    			insert_dev(target, t1, anchor);
+    			mount_component(label1, target, anchor);
+    			insert_dev(target, t2, anchor);
+    			insert_dev(target, div1, anchor);
+
+    			for (let i = 0; i < each_blocks.length; i += 1) {
+    				each_blocks[i].m(div1, null);
+    			}
+
+    			insert_dev(target, t3, anchor);
+    			insert_dev(target, div2, anchor);
+    			mount_component(button, div2, null);
+    			current = true;
+    		},
+    		p: function update(ctx, [dirty]) {
+    			const label0_changes = {};
+
+    			if (dirty & /*$$scope*/ 512) {
+    				label0_changes.$$scope = { dirty, ctx };
+    			}
+
+    			label0.$set(label0_changes);
+    			const inputnumbers_changes = {};
+
+    			if (!updating_value && dirty & /*padding*/ 1) {
+    				updating_value = true;
+    				inputnumbers_changes.value = /*padding*/ ctx[0];
+    				add_flush_callback(() => updating_value = false);
+    			}
+
+    			inputnumbers.$set(inputnumbers_changes);
+    			const label1_changes = {};
+
+    			if (dirty & /*$$scope*/ 512) {
+    				label1_changes.$$scope = { dirty, ctx };
+    			}
+
+    			label1.$set(label1_changes);
+
+    			if (dirty & /*normalizeColor, $colors, style*/ 6) {
+    				each_value = /*$colors*/ ctx[2];
+    				validate_each_argument(each_value);
+    				let i;
+
+    				for (i = 0; i < each_value.length; i += 1) {
+    					const child_ctx = get_each_context(ctx, each_value, i);
+
+    					if (each_blocks[i]) {
+    						each_blocks[i].p(child_ctx, dirty);
+    					} else {
+    						each_blocks[i] = create_each_block(child_ctx);
+    						each_blocks[i].c();
+    						each_blocks[i].m(div1, null);
+    					}
+    				}
+
+    				for (; i < each_blocks.length; i += 1) {
+    					each_blocks[i].d(1);
+    				}
+
+    				each_blocks.length = each_value.length;
+    			}
+
+    			const button_changes = {};
+
+    			if (dirty & /*$$scope*/ 512) {
+    				button_changes.$$scope = { dirty, ctx };
+    			}
+
+    			button.$set(button_changes);
+    		},
+    		i: function intro(local) {
+    			if (current) return;
+    			transition_in(label0.$$.fragment, local);
+    			transition_in(inputnumbers.$$.fragment, local);
+    			transition_in(label1.$$.fragment, local);
+    			transition_in(button.$$.fragment, local);
+    			current = true;
+    		},
+    		o: function outro(local) {
+    			transition_out(label0.$$.fragment, local);
+    			transition_out(inputnumbers.$$.fragment, local);
+    			transition_out(label1.$$.fragment, local);
+    			transition_out(button.$$.fragment, local);
+    			current = false;
+    		},
+    		d: function destroy(detaching) {
+    			destroy_component(label0, detaching);
+    			if (detaching) detach_dev(t0);
+    			if (detaching) detach_dev(div0);
+    			destroy_component(inputnumbers);
+    			if (detaching) detach_dev(t1);
+    			destroy_component(label1, detaching);
+    			if (detaching) detach_dev(t2);
+    			if (detaching) detach_dev(div1);
+    			destroy_each(each_blocks, detaching);
+    			if (detaching) detach_dev(t3);
+    			if (detaching) detach_dev(div2);
+    			destroy_component(button);
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_fragment$4.name,
+    		type: "component",
+    		source: "",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    function wrapIn(padding, style) {
+    	parent.postMessage(
+    		{
+    			pluginMessage: { type: "wrapIn", padding, style }
+    		},
+    		"*"
+    	);
+    }
+
+    function instance$4($$self, $$props, $$invalidate) {
+    	let $colors;
+    	validate_store(colors, 'colors');
+    	component_subscribe($$self, colors, $$value => $$invalidate(2, $colors = $$value));
+    	let { $$slots: slots = {}, $$scope } = $$props;
+    	validate_slots('PluginUI', slots, []);
+    	let padding = 32;
+    	let style = $colors[0];
+
+    	window.onmessage = async event => {
+    		const message = await event.data.pluginMessage;
+
+    		if (message.pluginMessage.type === "saved-params") {
+    			$$invalidate(0, padding = message.pluginMessage.params.padding);
+    			$$invalidate(1, style = message.pluginMessage.params.style);
+    		}
+    	};
+
+    	const writable_props = [];
+
+    	Object.keys($$props).forEach(key => {
+    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== '$$' && key !== 'slot') console.warn(`<PluginUI> was created with unknown prop '${key}'`);
+    	});
+
+    	function inputnumbers_value_binding(value) {
+    		padding = value;
+    		$$invalidate(0, padding);
+    	}
+
+    	const click_handler = color => {
+    		$$invalidate(1, style = color);
+    	};
+
+    	const click_handler_1 = () => wrapIn(padding, style);
+
+    	$$self.$capture_state = () => ({
+    		onMount,
+    		GlobalCSS: css_248z,
+    		Label,
+    		Icon,
+    		IconHorizontalPadding,
+    		Button,
+    		InputNumbers: Input_numbers,
+    		colors,
+    		normalizeColor,
+    		padding,
+    		style,
+    		wrapIn,
+    		$colors
+    	});
+
+    	$$self.$inject_state = $$props => {
+    		if ('padding' in $$props) $$invalidate(0, padding = $$props.padding);
+    		if ('style' in $$props) $$invalidate(1, style = $$props.style);
+    	};
+
+    	if ($$props && "$$inject" in $$props) {
+    		$$self.$inject_state($$props.$$inject);
+    	}
+
+    	return [
+    		padding,
+    		style,
+    		$colors,
+    		inputnumbers_value_binding,
+    		click_handler,
+    		click_handler_1
+    	];
+    }
+
+    class PluginUI extends SvelteComponentDev {
+    	constructor(options) {
+    		super(options);
+    		init(this, options, instance$4, create_fragment$4, safe_not_equal, {}, add_css$4);
+
+    		dispatch_dev("SvelteRegisterComponent", {
+    			component: this,
+    			tagName: "PluginUI",
+    			options,
+    			id: create_fragment$4.name
+    		});
+    	}
+    }
+
+    const app = new PluginUI({
+      target: document.body,
+    });
+
+    return app;
+
+}());
+</script>
+</body>
+</html>
