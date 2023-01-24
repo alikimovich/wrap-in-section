@@ -48,7 +48,7 @@
 </div>
 <div class="container">
   <Button on:click={() => wrapIn(padding, style)} variant="primary full-width"
-    >Wrap in section!</Button
+    >Wrap it!</Button
   >
 </div>
 

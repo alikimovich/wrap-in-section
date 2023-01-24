@@ -1,4 +1,4 @@
-# Wrap in section
+# Wrap in a Section
 
 A tiny Figma plugin.
 Wrap a new section around layers you've selected, or adjust the size of an existing section.
