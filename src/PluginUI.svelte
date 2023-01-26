@@ -1,7 +1,12 @@
 <script>
   import { onMount } from "svelte";
   import { GlobalCSS } from "figma-plugin-ds-svelte";
-  import { Label, Icon, IconHorizontalPadding } from "figma-plugin-ds-svelte";
+  import {
+    Label,
+    Icon,
+    IconHorizontalPadding,
+    Checkbox,
+  } from "figma-plugin-ds-svelte";
   import { Button, InputNumbers } from "./components/components";
 
   import { colors } from "./stores";
@@ -10,9 +15,15 @@
   let padding = 32;
   let style = $colors[0];
 
+  let title = false;
+  let subtitle = false;
+  $: textSettings = { title, subtitle };
+
   function wrapIn(padding, style) {
     parent.postMessage(
-      { pluginMessage: { type: "wrapIn", padding, style } },
+      {
+        pluginMessage: { type: "wrapIn", padding, style, textSettings },
+      },
       "*"
     );
   }
@@ -22,9 +33,15 @@
     if (message.pluginMessage.type === "saved-params") {
       padding = message.pluginMessage.params.padding;
       style = message.pluginMessage.params.style;
+      title = message.pluginMessage.params.textSettings.title;
+      subtitle = message.pluginMessage.params.textSettings.subtitle;
     }
   };
 </script>
+
+<Label>Text settings</Label>
+<Checkbox bind:checked={title}>Add a title</Checkbox>
+<Checkbox bind:checked={subtitle}>Add a subtitle</Checkbox>
 
 <Label>Paddings</Label>
 <div class="container">
@@ -47,8 +64,9 @@
   {/each}
 </div>
 <div class="container">
-  <Button on:click={() => wrapIn(padding, style)} variant="primary full-width"
-    >Wrap it!</Button
+  <Button
+    on:click={() => wrapIn(padding, style, textSettings)}
+    variant="primary full-width">Wrap it!</Button
   >
 </div>
 
@@ -61,7 +79,7 @@
     grid-template-columns: repeat(7, var(--size-medium));
     gap: var(--size-xxxsmall);
     width: 100%;
-    margin-bottom: var(--size-xxsmall);
+    margin-bottom: var(--size-xsmall);
   }
   .color-selector {
     cursor: pointer;
