@@ -39,38 +39,47 @@
   };
 </script>
 
-<Label>Text settings</Label>
-<Checkbox bind:checked={title}>Add a title</Checkbox>
-<Checkbox bind:checked={subtitle}>Add a subtitle</Checkbox>
+<body>
+  <Label>Text settings</Label>
+  <Checkbox bind:checked={title}>Add a title</Checkbox>
+  <Checkbox bind:checked={subtitle}>Add a subtitle</Checkbox>
 
-<Label>Paddings</Label>
-<div class="container">
-  <InputNumbers bind:value={padding} borders iconName={IconHorizontalPadding} />
-</div>
-<Label>Color</Label>
-<div class="color-grid container">
-  {#each $colors as color}
-    <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <div
-      class="color-selector"
-      class:selected={style.name === color.name}
-      style="background:{normalizeColor(
-        color.fills
-      )}; border-color:{normalizeColor(color.stroke)};"
-      on:click={() => {
-        style = color;
-      }}
+  <Label>Padding</Label>
+  <div class="container">
+    <InputNumbers
+      bind:value={padding}
+      borders
+      iconName={IconHorizontalPadding}
     />
-  {/each}
-</div>
-<div class="container">
-  <Button
-    on:click={() => wrapIn(padding, style, textSettings)}
-    variant="primary full-width">Wrap it!</Button
-  >
-</div>
+  </div>
+  <Label>Color</Label>
+  <div class="color-grid container">
+    {#each $colors as color}
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
+      <div
+        class="color-selector"
+        class:selected={style.name === color.name}
+        style="background:{normalizeColor(
+          color.fills
+        )}; border-color:{normalizeColor(color.stroke)};"
+        on:click={() => {
+          style = color;
+        }}
+      />
+    {/each}
+  </div>
+  <div class="container">
+    <Button
+      on:click={() => wrapIn(padding, style, textSettings)}
+      variant="primary full-width">Wrap it!</Button
+    >
+  </div>
+</body>
 
 <style>
+  body {
+    overflow: hidden;
+  }
   .container {
     margin: auto var(--size-xxsmall) var(--size-xxsmall) var(--size-xxsmall);
   }
