@@ -42,6 +42,19 @@ figma.ui.onmessage = async (msg) => {
       else if (filtered.length >= 1) {
 
         const section = figma.createSection()
+        // find the first node with parent section, create a child section for it. if there is no parent section, just go further
+        var hasParent = false;
+        let i = 0
+        while (filtered[i]) {
+          if (filtered[i].parent?.type === 'SECTION') {
+            filtered[i].parent.appendChild(section)
+            hasParent = true
+            break;
+          }
+          i++
+        }
+
+        // setting up the section
         section.name = msg.style.name
         section.fills = [{ type: 'SOLID', color: style.fills }]
 
@@ -58,7 +71,12 @@ figma.ui.onmessage = async (msg) => {
         // ungrouping
         figma.ungroup(tempGroup)
         figma.currentPage.selection = [section]
-        figma.notify(`✅`)
+        if (hasParent) {
+          figma.notify(`🔳 The nested section has been created`)
+        } else {
+          figma.notify(`✅`)
+        }
+
       } else {
         figma.notify(`Start by selecting some layers!`)
       }

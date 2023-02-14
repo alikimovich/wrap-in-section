@@ -83,8 +83,12 @@ export function getStyle() {
 // fit size of a section to it's inner group
 export function fitSize(section, group, padding, style) {
     console.log(section, group, padding, style);
-    section.x = group.absoluteBoundingBox.x - padding;
-    section.y = group.absoluteBoundingBox.y - padding;
+    // find content position relative to a parent node
+    const relativeX = section.x + group.x;
+    const relativeY = section.y + group.y;
+    // find content position relative to a parent node
+    section.x = relativeX - padding;
+    section.y = relativeY - padding;
     section.fills = [{ type: 'SOLID', color: style.fills }];
     section.resizeWithoutConstraints(group.absoluteBoundingBox.width + padding * 2, group.absoluteBoundingBox.height + padding * 2);
     // redefining position
