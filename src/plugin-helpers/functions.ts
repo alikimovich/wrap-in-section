@@ -69,7 +69,7 @@ async function loadFont(font: string, style: string) {
     try {
         await figma.loadFontAsync({ family: font, style: style });
     } catch (err) {
-        console.log(`❌ Error: ${err}`);
+        console.log(`🖍️ loadFont error: ${err}`);
     }
 }
 
@@ -83,12 +83,11 @@ export function getStyle() {
                 figma.ui.postMessage({ pluginMessage: { type: 'saved-params', params } });
             }
         })
-        .catch((error) => console.log('error', error));
+        .catch((err) => console.log('🐞 getStyle error', err));
 }
 
 // fit size of a section to it's inner group
 export function fitSize(section, group, padding, style) {
-    console.log(section, group, padding, style)
     // find content position relative to a parent node
     const relativeX = section.x + group.x
     const relativeY = section.y + group.y
