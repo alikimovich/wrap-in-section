@@ -1,9 +1,24 @@
-import { addText, getStyle, fitSize } from "./plugin-helpers/functions";
+import { addText, getStyle, fitSize, isItLight } from "./plugin-helpers/functions";
 
 figma.showUI(__html__, { themeColors: true, width: 264, height: 324 });
 
+let isItLightMode = isItLight(figma.currentPage.backgrounds[0].color)
+figma.ui.postMessage({ pluginMessage: { type: 'isItLightMode', isItLightMode } });
+
 // getting previously used style
 getStyle();
+figma.on("documentchange", (event) => {
+  for (const change of event.documentChanges) {
+    switch (change.type) {
+      case "PROPERTY_CHANGE":
+        isItLightMode = isItLight(figma.currentPage.backgrounds[0].color)
+        figma.ui.postMessage({ pluginMessage: { type: 'isItLightMode', isItLightMode } })
+        break;
+    }
+  }
+
+})
+
 
 figma.ui.onmessage = async (msg) => {
   switch (msg.type) {
@@ -32,7 +47,7 @@ figma.ui.onmessage = async (msg) => {
           const children = innerSection.findChildren(n => n.type !== 'SLICE')
           figma.group(children, innerSection, 0)
           const tempGroup = innerSection.children[0]
-          fitSize(innerSection, tempGroup, padding, style)
+          fitSize(innerSection, tempGroup, padding, isItLightMode, style)
           figma.ungroup(tempGroup)
           figma.notify('✨ Fits perfectly!')
         }
@@ -56,17 +71,17 @@ figma.ui.onmessage = async (msg) => {
 
         // setting up the section
         section.name = msg.style.name
-        section.fills = [{ type: 'SOLID', color: style.fills }]
+        section.fills = [{ type: 'SOLID', color: isItLightMode ? style.fills : style.fillsDark }]
 
         // grouping all the selected objects to find x, y, width and height
         figma.group(filtered, section, 0)
         const tempGroup = section.children[0]
-        await addText(tempGroup, textSettings);
+        await addText(tempGroup, isItLightMode, textSettings);
 
         // add all the objects as children
         section.appendChild(tempGroup)
 
-        fitSize(section, tempGroup, padding, style)
+        fitSize(section, tempGroup, padding, isItLightMode, style)
 
         // ungrouping
         figma.ungroup(tempGroup)

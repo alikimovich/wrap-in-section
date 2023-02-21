@@ -18,6 +18,7 @@
   let title = false;
   let subtitle = false;
   $: textSettings = { title, subtitle };
+  let isItLightMode = true;
 
   function wrapIn(padding, style) {
     parent.postMessage(
@@ -35,6 +36,9 @@
       style = message.pluginMessage.params.style;
       title = message.pluginMessage.params.textSettings.title;
       subtitle = message.pluginMessage.params.textSettings.subtitle;
+    }
+    if (message.pluginMessage.type === "isItLightMode") {
+      isItLightMode = message.pluginMessage.isItLightMode;
     }
   };
 </script>
@@ -59,9 +63,11 @@
       <div
         class="color-selector"
         class:selected={style.name === color.name}
-        style="background:{normalizeColor(
-          color.fills
-        )}; border-color:{normalizeColor(color.stroke)};"
+        style="background:{isItLightMode
+          ? normalizeColor(color.fills)
+          : normalizeColor(color.fillsDark)}; border-color:{isItLightMode
+          ? normalizeColor(color.stroke)
+          : normalizeColor({ r: 0.99, g: 0.99, b: 0.99 })};"
         on:click={() => {
           style = color;
         }}
@@ -99,6 +105,6 @@
     border-style: solid;
   }
   .color-selector.selected {
-    border-width: 2px;
+    border-width: 3px;
   }
 </style>
