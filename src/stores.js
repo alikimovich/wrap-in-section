@@ -95,7 +95,7 @@ export const colors = readable([
   {
     name: "white",
     fills: { r: 1.0, g: 1.0, b: 1.0 },
-    fillsDark: {},
+    fillsDark: { r: 0.8, g: 0.8, b: 0.8 },
     opacity: 0.9,
     stroke: { r: 0.9, g: 0.9, b: 0.9 },
   },
