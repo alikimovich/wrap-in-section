@@ -81,13 +81,14 @@ export function getStyle() {
             if (res) {
                 params = res;
                 figma.ui.postMessage({ pluginMessage: { type: 'saved-params', params } });
+                return params;
             }
         })
         .catch((err) => console.log('🐞 getStyle error', err));
 }
 
 // fit size of a section to it's inner group
-export function fitSize(section, group, padding, isItLightMode, style) {
+export function fitSize(section, group, padding) {
     // find content position relative to a parent node
     const relativeX = section.x + group.x
     const relativeY = section.y + group.y
@@ -95,7 +96,6 @@ export function fitSize(section, group, padding, isItLightMode, style) {
     // find content position relative to a parent node
     section.x = relativeX - padding
     section.y = relativeY - padding
-    section.fills = [{ type: 'SOLID', color: isItLightMode ? style.fills : style.fillsDark, opacity: isItLightMode ? 1 : style.opacity }]
     section.resizeWithoutConstraints(
         group.absoluteBoundingBox.width + padding * 2,
         group.absoluteBoundingBox.height + padding * 2

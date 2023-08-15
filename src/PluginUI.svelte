@@ -1,11 +1,10 @@
 <script>
-  import { onMount } from "svelte";
   import { GlobalCSS } from "figma-plugin-ds-svelte";
   import {
     Label,
-    Icon,
     IconHorizontalPadding,
     Checkbox,
+    Input,
   } from "figma-plugin-ds-svelte";
   import { Button, InputNumbers } from "./components/components";
 
@@ -74,6 +73,7 @@
       />
     {/each}
   </div>
+
   <div class="container">
     <Button
       on:click={() => wrapIn(padding, style, textSettings)}
